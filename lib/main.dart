@@ -502,6 +502,7 @@ class DialerPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canCall = selectedAccount != null && dialNumber.trim().isNotEmpty;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return SectionCard(
       child: Column(
@@ -514,56 +515,69 @@ class DialerPanel extends StatelessWidget {
           const SizedBox(height: 16),
           AccountContextBanner(account: selectedAccount),
           const SizedBox(height: 16),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F5F2),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      dialNumber.isEmpty ? 'Enter number' : dialNumber,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(
-                            color: dialNumber.isEmpty
-                                ? Theme.of(context).colorScheme.onSurfaceVariant
-                                : Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F5F2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colorScheme.outlineVariant),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              dialNumber.isEmpty ? 'Enter number' : dialNumber,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    color: dialNumber.isEmpty
+                                        ? colorScheme.onSurfaceVariant
+                                        : colorScheme.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
                           ),
+                          IconButton(
+                            tooltip: 'Backspace',
+                            onPressed: dialNumber.isEmpty ? null : onBackspace,
+                            icon: const Icon(Icons.backspace_outlined),
+                          ),
+                          IconButton(
+                            tooltip: 'Clear',
+                            onPressed: dialNumber.isEmpty ? null : onClear,
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Backspace',
-                    onPressed: dialNumber.isEmpty ? null : onBackspace,
-                    icon: const Icon(Icons.backspace_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'Clear',
-                    onPressed: dialNumber.isEmpty ? null : onClear,
-                    icon: const Icon(Icons.close),
+                  const SizedBox(height: 14),
+                  DialPad(onAppend: onAppend),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton.icon(
+                      onPressed: canCall ? onCall : null,
+                      icon: const Icon(Icons.call),
+                      label: const Text('Call'),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          DialPad(onAppend: onAppend),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: canCall ? onCall : null,
-              icon: const Icon(Icons.call),
-              label: const Text('Call'),
             ),
           ),
         ],
@@ -626,9 +640,9 @@ class DialPad extends StatelessWidget {
       itemCount: values.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        childAspectRatio: 2.6,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+        mainAxisExtent: 58,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
       ),
       itemBuilder: (context, index) {
         final value = values[index];
