@@ -792,108 +792,180 @@ class MobileDialerView extends StatelessWidget {
         dialNumber.trim().isNotEmpty &&
         !voip.hasActiveCall;
 
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: dialNumber.isEmpty
-                    ? Column(
-                        key: const ValueKey('brand'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.wifi_calling_3_outlined,
-                            size: 104,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            'MNSCloud',
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tightHeight = constraints.maxHeight < 480;
+        final compactHeight = constraints.maxHeight < 560;
+        final dialKeyHeight = tightHeight
+            ? 56.0
+            : compactHeight
+                ? 68.0
+                : 86.0;
+        final callButtonSize = tightHeight
+            ? 54.0
+            : compactHeight
+                ? 60.0
+                : 74.0;
+        final brandIconSize = tightHeight
+            ? 48.0
+            : compactHeight
+                ? 72.0
+                : 104.0;
+        final brandFontSize = tightHeight
+            ? 24.0
+            : compactHeight
+                ? 32.0
+                : 42.0;
+        final numberFontSize = tightHeight
+            ? 30.0
+            : compactHeight
+                ? 34.0
+                : 42.0;
+        final contentPadding = tightHeight
+            ? 6.0
+            : compactHeight
+                ? 12.0
+                : 24.0;
+
+        return Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(contentPadding),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: dialNumber.isEmpty
+                        ? Column(
+                            key: const ValueKey('brand'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.wifi_calling_3_outlined,
+                                size: brandIconSize,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              SizedBox(
+                                  height: tightHeight
+                                      ? 6
+                                      : compactHeight
+                                          ? 8
+                                          : 18),
+                              Text(
+                                'MNSCloud',
+                                style: TextStyle(
+                                  fontSize: brandFontSize,
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            dialNumber,
+                            key: const ValueKey('number'),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 42,
-                              color: colorScheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w900,
+                              fontSize: numberFontSize,
+                              fontWeight: FontWeight.w300,
+                              letterSpacing: 0,
                             ),
                           ),
-                        ],
-                      )
-                    : Text(
-                        dialNumber,
-                        key: const ValueKey('number'),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: 0,
-                        ),
-                      ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        Divider(height: 1, color: colorScheme.outlineVariant),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 22, 8, 8),
-          child: MobileDialPad(onAppend: onAppend),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(26, 0, 26, 20),
-          child: Row(
-            children: [
-              Expanded(
-                child: MobileUtilityButton(
-                  icon: Icons.voicemail,
-                  label: 'VM',
-                  onPressed: () => onAppend('*97'),
-                ),
+            Divider(height: 1, color: colorScheme.outlineVariant),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                8,
+                tightHeight
+                    ? 4
+                    : compactHeight
+                        ? 8
+                        : 22,
+                8,
+                4,
               ),
-              SizedBox(
-                width: 74,
-                height: 74,
-                child: FilledButton(
-                  onPressed: canCall ? onCall : null,
-                  style: FilledButton.styleFrom(
-                    shape: const CircleBorder(),
-                    backgroundColor: colorScheme.secondary,
-                    disabledBackgroundColor:
-                        colorScheme.surfaceContainerHighest,
-                    padding: EdgeInsets.zero,
+              child: MobileDialPad(
+                keyHeight: dialKeyHeight,
+                onAppend: onAppend,
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                26,
+                0,
+                26,
+                tightHeight
+                    ? 6
+                    : compactHeight
+                        ? 8
+                        : 20,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: MobileUtilityButton(
+                      icon: Icons.voicemail,
+                      label: 'VM',
+                      compact: compactHeight,
+                      onPressed: () => onAppend('*97'),
+                    ),
                   ),
-                  child: const Icon(Icons.call, size: 34),
-                ),
-              ),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton(
-                    onPressed: dialNumber.isEmpty ? null : onBackspace,
-                    icon: const Icon(Icons.backspace_outlined, size: 34),
+                  SizedBox(
+                    width: callButtonSize,
+                    height: callButtonSize,
+                    child: FilledButton(
+                      onPressed: canCall ? onCall : null,
+                      style: FilledButton.styleFrom(
+                        shape: const CircleBorder(),
+                        backgroundColor: colorScheme.secondary,
+                        disabledBackgroundColor:
+                            colorScheme.surfaceContainerHighest,
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: Icon(Icons.call, size: compactHeight ? 28 : 34),
+                    ),
                   ),
-                ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        onPressed: dialNumber.isEmpty ? null : onBackspace,
+                        icon: Icon(
+                          Icons.backspace_outlined,
+                          size: compactHeight ? 28 : 34,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-        if (voip.hasActiveCall)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-            child: ActiveCallControls(voip: voip),
-          ),
-      ],
+            ),
+            if (voip.hasActiveCall)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                child: ActiveCallControls(voip: voip),
+              ),
+          ],
+        );
+      },
     );
   }
 }
 
 class MobileDialPad extends StatelessWidget {
-  const MobileDialPad({required this.onAppend, super.key});
+  const MobileDialPad({
+    required this.onAppend,
+    this.keyHeight = 86,
+    super.key,
+  });
 
   final ValueChanged<String> onAppend;
+  final double keyHeight;
 
   static const keys = [
     ('1', ''),
@@ -917,9 +989,9 @@ class MobileDialPad extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: keys.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisExtent: 86,
+        mainAxisExtent: keyHeight,
         mainAxisSpacing: 2,
         crossAxisSpacing: 2,
       ),
@@ -936,8 +1008,8 @@ class MobileDialPad extends StatelessWidget {
             children: [
               Text(
                 key.$1,
-                style: const TextStyle(
-                  fontSize: 40,
+                style: TextStyle(
+                  fontSize: keyHeight < 76 ? 34 : 40,
                   fontWeight: FontWeight.w300,
                   height: 1,
                 ),
@@ -966,12 +1038,14 @@ class MobileUtilityButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.compact = false,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -981,7 +1055,7 @@ class MobileUtilityButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 34, color: colorScheme.onSurface),
+          Icon(icon, size: compact ? 28 : 34, color: colorScheme.onSurface),
           Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant)),
         ],
       ),
@@ -1453,7 +1527,7 @@ class DialerPanel extends StatelessWidget {
                 children: [
                   DecoratedBox(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F5F2),
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: colorScheme.outlineVariant),
                     ),
@@ -2244,20 +2318,22 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAF7),
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
           Icon(
             icon,
             size: 34,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 10),
           Text(
@@ -2272,7 +2348,7 @@ class EmptyState extends StatelessWidget {
             message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
                 ),
           ),
           if (actionLabel != null && onAction != null) ...[
