@@ -348,8 +348,6 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                               selectedAccount: _selectedAccount,
                               dialNumber: _dialNumber,
                               voip: _voip,
-                              accountCount: _accounts.length,
-                              lastEvent: _lastEvent,
                               onAppend: _appendDial,
                               onBackspace: _backspaceDial,
                               onClear: _clearDial,
@@ -401,11 +399,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onCall: _makeCall,
       ),
       const SizedBox(height: 16),
-      BottomPanels(
-        accountCount: _accounts.length,
-        voip: _voip,
-        lastEvent: _lastEvent,
-      ),
+      const CallHistoryPanel(),
     ];
   }
 }
@@ -415,8 +409,6 @@ class WorkspacePanels extends StatelessWidget {
     required this.selectedAccount,
     required this.dialNumber,
     required this.voip,
-    required this.accountCount,
-    required this.lastEvent,
     required this.onAppend,
     required this.onBackspace,
     required this.onClear,
@@ -427,8 +419,6 @@ class WorkspacePanels extends StatelessWidget {
   final WebRtcAccount? selectedAccount;
   final String dialNumber;
   final PhoneWebVoipController voip;
-  final int accountCount;
-  final String lastEvent;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
@@ -454,20 +444,7 @@ class WorkspacePanels extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              SizedBox(
-                width: 360,
-                child: Column(
-                  children: [
-                    DiagnosticsPanel(
-                      accountCount: accountCount,
-                      voip: voip,
-                      lastEvent: lastEvent,
-                    ),
-                    const SizedBox(height: 16),
-                    const Expanded(child: CallHistoryPanel()),
-                  ],
-                ),
-              ),
+              const SizedBox(width: 360, child: CallHistoryPanel()),
             ],
           );
         }
@@ -484,11 +461,7 @@ class WorkspacePanels extends StatelessWidget {
               onCall: onCall,
             ),
             const SizedBox(height: 16),
-            BottomPanels(
-              accountCount: accountCount,
-              voip: voip,
-              lastEvent: lastEvent,
-            ),
+            const CallHistoryPanel(),
           ],
         );
       },
@@ -1837,86 +1810,6 @@ class ActiveCallControls extends StatelessWidget {
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class BottomPanels extends StatelessWidget {
-  const BottomPanels({
-    required this.accountCount,
-    required this.voip,
-    required this.lastEvent,
-    super.key,
-  });
-
-  final int accountCount;
-  final PhoneWebVoipController voip;
-  final String lastEvent;
-
-  @override
-  Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 760;
-    final panels = [
-      Expanded(
-        child: DiagnosticsPanel(
-          accountCount: accountCount,
-          voip: voip,
-          lastEvent: lastEvent,
-        ),
-      ),
-      const SizedBox(width: 16, height: 16),
-      const Expanded(child: CallHistoryPanel()),
-    ];
-
-    if (compact) {
-      return Column(
-        children: [
-          DiagnosticsPanel(
-            accountCount: accountCount,
-            voip: voip,
-            lastEvent: lastEvent,
-          ),
-          const SizedBox(height: 16),
-          const CallHistoryPanel(),
-        ],
-      );
-    }
-
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: panels);
-  }
-}
-
-class DiagnosticsPanel extends StatelessWidget {
-  const DiagnosticsPanel({
-    required this.accountCount,
-    required this.voip,
-    required this.lastEvent,
-    super.key,
-  });
-
-  final int accountCount;
-  final PhoneWebVoipController voip;
-  final String lastEvent;
-
-  @override
-  Widget build(BuildContext context) {
-    return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const PanelTitle(
-            icon: Icons.monitor_heart_outlined,
-            title: 'Diagnostics',
-          ),
-          const SizedBox(height: 12),
-          InfoRow(label: 'WebRTC engine', value: 'sip_ua'),
-          InfoRow(label: 'Transport', value: voip.transportState.name),
-          InfoRow(label: 'Registration', value: voip.registrationStatus.label),
-          InfoRow(label: 'Call state', value: voip.callState.name),
-          InfoRow(label: 'Accounts loaded', value: '$accountCount'),
-          InfoRow(label: 'Last event', value: lastEvent),
         ],
       ),
     );
