@@ -73,6 +73,14 @@ rules. See [Platform Limitations](docs/platform-limitations.md).
 - `freezed` and `json_serializable` for immutable models
 - local sanitized diagnostics logger
 
+## SIP UA Dependency
+
+PhoneWeb currently vendors `sip_ua` under `third_party/sip_ua` with a minimal
+Web JS interop compatibility patch for the Flutter/Dart toolchain used by this
+repository. Keep the vendored package free of examples, secrets, and local
+build output. Replace it with the upstream package again once the upstream
+release compiles cleanly for Flutter Web.
+
 ## WebRTC Provider Requirements
 
 A provider must expose SIP over WebSocket/WebRTC. Typical requirements:
@@ -252,4 +260,3 @@ Use placeholder examples such as `pbx.example.com`, `wss://pbx.example.com/ws`,
 - [Provider Compatibility](docs/provider-compatibility.md)
 - [SDK Strategy](docs/sdk-strategy.md)
 - [Roadmap](docs/roadmap.md)
-

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'src/account/webrtc_account.dart';
+import 'src/voip/phoneweb_voip_controller.dart';
+
 void main() {
   runApp(const PhoneWebApp());
 }
@@ -50,9 +53,24 @@ class PhoneWebHomePage extends StatefulWidget {
 
 class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final List<WebRtcAccount> _accounts = [];
+  late final PhoneWebVoipController _voip;
   String? _selectedAccountId;
   String _dialNumber = '';
   String _lastEvent = 'Ready';
+
+  @override
+  void initState() {
+    super.initState();
+    _voip = PhoneWebVoipController();
+    _voip.addListener(_syncVoipState);
+  }
+
+  @override
+  void dispose() {
+    _voip.removeListener(_syncVoipState);
+    _voip.dispose();
+    super.dispose();
+  }
 
   WebRtcAccount? get _selectedAccount {
     for (final account in _accounts) {
@@ -84,6 +102,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         _lastEvent = '${result.name} added';
       }
     });
+
+    if (result.autoRegister && result.enabled) {
+      await _voip.register(result);
+    }
   }
 
   void _removeAccount(WebRtcAccount account) {
@@ -96,26 +118,38 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
-  void _toggleRegistration(WebRtcAccount account) {
+  Future<void> _toggleRegistration(WebRtcAccount account) async {
+    if (account.status == RegistrationStatus.registered ||
+        account.status == RegistrationStatus.registering) {
+      await _voip.unregister();
+      return;
+    }
+
+    await _voip.register(account);
+  }
+
+  void _syncVoipState() {
     setState(() {
-      final index = _accounts.indexWhere((item) => item.id == account.id);
-      if (index < 0) {
-        return;
+      final activeAccount = _voip.account;
+      if (activeAccount != null) {
+        final index =
+            _accounts.indexWhere((item) => item.id == activeAccount.id);
+        if (index >= 0) {
+          _accounts[index] = _accounts[index].copyWith(
+            status: _voip.registrationStatus,
+            enabled: _voip.registrationStatus == RegistrationStatus.registered,
+          );
+        }
       }
-
-      final nextStatus = account.status == RegistrationStatus.registered
-          ? RegistrationStatus.offline
-          : RegistrationStatus.registered;
-
-      _accounts[index] = account.copyWith(
-        status: nextStatus,
-        enabled: nextStatus == RegistrationStatus.registered,
-      );
-      _lastEvent = '${account.name} ${nextStatus.label.toLowerCase()}';
+      _lastEvent = _voip.lastEvent;
     });
   }
 
   void _appendDial(String value) {
+    if (_voip.hasActiveCall) {
+      _voip.sendDtmf(value);
+    }
+
     setState(() {
       _dialNumber = '$_dialNumber$value';
     });
@@ -137,16 +171,13 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
-  void _simulateCall() {
+  Future<void> _makeCall() async {
     final account = _selectedAccount;
     if (account == null || _dialNumber.trim().isEmpty) {
       return;
     }
 
-    setState(() {
-      _lastEvent =
-          'Outgoing call prepared from ${account.name} to $_dialNumber';
-    });
+    await _voip.makeCall(_dialNumber);
   }
 
   @override
@@ -196,12 +227,13 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                             child: WorkspacePanels(
                               selectedAccount: _selectedAccount,
                               dialNumber: _dialNumber,
+                              voip: _voip,
                               accountCount: _accounts.length,
                               lastEvent: _lastEvent,
                               onAppend: _appendDial,
                               onBackspace: _backspaceDial,
                               onClear: _clearDial,
-                              onCall: _simulateCall,
+                              onCall: _makeCall,
                             ),
                           ),
                         ],
@@ -233,13 +265,18 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       DialerPanel(
         selectedAccount: _selectedAccount,
         dialNumber: _dialNumber,
+        voip: _voip,
         onAppend: _appendDial,
         onBackspace: _backspaceDial,
         onClear: _clearDial,
-        onCall: _simulateCall,
+        onCall: _makeCall,
       ),
       const SizedBox(height: 16),
-      BottomPanels(accountCount: _accounts.length, lastEvent: _lastEvent),
+      BottomPanels(
+        accountCount: _accounts.length,
+        voip: _voip,
+        lastEvent: _lastEvent,
+      ),
     ];
   }
 }
@@ -248,6 +285,7 @@ class WorkspacePanels extends StatelessWidget {
   const WorkspacePanels({
     required this.selectedAccount,
     required this.dialNumber,
+    required this.voip,
     required this.accountCount,
     required this.lastEvent,
     required this.onAppend,
@@ -259,6 +297,7 @@ class WorkspacePanels extends StatelessWidget {
 
   final WebRtcAccount? selectedAccount;
   final String dialNumber;
+  final PhoneWebVoipController voip;
   final int accountCount;
   final String lastEvent;
   final ValueChanged<String> onAppend;
@@ -278,6 +317,7 @@ class WorkspacePanels extends StatelessWidget {
                 child: DialerPanel(
                   selectedAccount: selectedAccount,
                   dialNumber: dialNumber,
+                  voip: voip,
                   onAppend: onAppend,
                   onBackspace: onBackspace,
                   onClear: onClear,
@@ -291,6 +331,7 @@ class WorkspacePanels extends StatelessWidget {
                   children: [
                     DiagnosticsPanel(
                       accountCount: accountCount,
+                      voip: voip,
                       lastEvent: lastEvent,
                     ),
                     const SizedBox(height: 16),
@@ -307,13 +348,18 @@ class WorkspacePanels extends StatelessWidget {
             DialerPanel(
               selectedAccount: selectedAccount,
               dialNumber: dialNumber,
+              voip: voip,
               onAppend: onAppend,
               onBackspace: onBackspace,
               onClear: onClear,
               onCall: onCall,
             ),
             const SizedBox(height: 16),
-            BottomPanels(accountCount: accountCount, lastEvent: lastEvent),
+            BottomPanels(
+              accountCount: accountCount,
+              voip: voip,
+              lastEvent: lastEvent,
+            ),
           ],
         );
       },
@@ -555,6 +601,7 @@ class DialerPanel extends StatelessWidget {
   const DialerPanel({
     required this.selectedAccount,
     required this.dialNumber,
+    required this.voip,
     required this.onAppend,
     required this.onBackspace,
     required this.onClear,
@@ -564,6 +611,7 @@ class DialerPanel extends StatelessWidget {
 
   final WebRtcAccount? selectedAccount;
   final String dialNumber;
+  final PhoneWebVoipController voip;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
@@ -571,7 +619,10 @@ class DialerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canCall = selectedAccount != null && dialNumber.trim().isNotEmpty;
+    final canCall = selectedAccount != null &&
+        voip.registrationStatus == RegistrationStatus.registered &&
+        dialNumber.trim().isNotEmpty &&
+        !voip.hasActiveCall;
     final colorScheme = Theme.of(context).colorScheme;
 
     return SectionCard(
@@ -646,6 +697,10 @@ class DialerPanel extends StatelessWidget {
                       label: const Text('Call'),
                     ),
                   ),
+                  if (voip.hasActiveCall) ...[
+                    const SizedBox(height: 14),
+                    ActiveCallControls(voip: voip),
+                  ],
                 ],
               ),
             ),
@@ -731,14 +786,88 @@ class DialPad extends StatelessWidget {
   }
 }
 
+class ActiveCallControls extends StatelessWidget {
+  const ActiveCallControls({required this.voip, super.key});
+
+  final PhoneWebVoipController voip;
+
+  @override
+  Widget build(BuildContext context) {
+    final remote =
+        voip.remoteIdentity.isEmpty ? 'Unknown' : voip.remoteIdentity;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.call_outlined),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$remote · ${voip.callState.name}',
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (voip.hasIncomingCall)
+                FilledButton.icon(
+                  onPressed: voip.answer,
+                  icon: const Icon(Icons.call),
+                  label: const Text('Answer'),
+                ),
+              FilledButton.tonalIcon(
+                onPressed: voip.toggleMute,
+                icon: Icon(voip.muted ? Icons.mic_off : Icons.mic),
+                label: Text(voip.muted ? 'Unmute' : 'Mute'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: voip.toggleHold,
+                icon: Icon(voip.onHold ? Icons.play_arrow : Icons.pause),
+                label: Text(voip.onHold ? 'Resume' : 'Hold'),
+              ),
+              FilledButton.icon(
+                onPressed: voip.rejectOrHangup,
+                icon: const Icon(Icons.call_end),
+                label: const Text('Hang up'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFB91C1C),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class BottomPanels extends StatelessWidget {
   const BottomPanels({
     required this.accountCount,
+    required this.voip,
     required this.lastEvent,
     super.key,
   });
 
   final int accountCount;
+  final PhoneWebVoipController voip;
   final String lastEvent;
 
   @override
@@ -748,6 +877,7 @@ class BottomPanels extends StatelessWidget {
       Expanded(
         child: DiagnosticsPanel(
           accountCount: accountCount,
+          voip: voip,
           lastEvent: lastEvent,
         ),
       ),
@@ -758,7 +888,11 @@ class BottomPanels extends StatelessWidget {
     if (compact) {
       return Column(
         children: [
-          DiagnosticsPanel(accountCount: accountCount, lastEvent: lastEvent),
+          DiagnosticsPanel(
+            accountCount: accountCount,
+            voip: voip,
+            lastEvent: lastEvent,
+          ),
           const SizedBox(height: 16),
           const CallHistoryPanel(),
         ],
@@ -775,11 +909,13 @@ class BottomPanels extends StatelessWidget {
 class DiagnosticsPanel extends StatelessWidget {
   const DiagnosticsPanel({
     required this.accountCount,
+    required this.voip,
     required this.lastEvent,
     super.key,
   });
 
   final int accountCount;
+  final PhoneWebVoipController voip;
   final String lastEvent;
 
   @override
@@ -793,7 +929,10 @@ class DiagnosticsPanel extends StatelessWidget {
             title: 'Diagnostics',
           ),
           const SizedBox(height: 12),
-          InfoRow(label: 'WebRTC engine', value: 'Idle'),
+          InfoRow(label: 'WebRTC engine', value: 'sip_ua'),
+          InfoRow(label: 'Transport', value: voip.transportState.name),
+          InfoRow(label: 'Registration', value: voip.registrationStatus.label),
+          InfoRow(label: 'Call state', value: voip.callState.name),
           InfoRow(label: 'Accounts loaded', value: '$accountCount'),
           InfoRow(label: 'Last event', value: lastEvent),
         ],
@@ -848,6 +987,7 @@ class _AccountDialogState extends State<AccountDialog> {
   late final TextEditingController _passwordController;
   bool _enabled = true;
   bool _autoRegister = true;
+  bool _allowInsecureTransport = false;
 
   @override
   void initState() {
@@ -862,9 +1002,10 @@ class _AccountDialogState extends State<AccountDialog> {
     _wssController = TextEditingController(text: account?.wssServer ?? '');
     _stunController = TextEditingController(text: account?.stunServer ?? '');
     _turnController = TextEditingController(text: account?.turnServer ?? '');
-    _passwordController = TextEditingController();
+    _passwordController = TextEditingController(text: account?.password ?? '');
     _enabled = account?.enabled ?? true;
     _autoRegister = account?.autoRegister ?? true;
+    _allowInsecureTransport = account?.allowInsecureTransport ?? false;
   }
 
   @override
@@ -1013,6 +1154,20 @@ class _AccountDialogState extends State<AccountDialog> {
                           });
                         },
                       ),
+                      FilterChip(
+                        selected: _allowInsecureTransport,
+                        label: const Text('Allow WS dev'),
+                        avatar: Icon(
+                          _allowInsecureTransport
+                              ? Icons.lock_open
+                              : Icons.lock_outline,
+                        ),
+                        onSelected: (value) {
+                          setState(() {
+                            _allowInsecureTransport = value;
+                          });
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -1052,8 +1207,12 @@ class _AccountDialogState extends State<AccountDialog> {
     if (required != null) {
       return required;
     }
-    if (!value!.trim().startsWith('wss://')) {
-      return 'Use a secure WSS URL';
+    final trimmed = value!.trim();
+    if (!trimmed.startsWith('wss://') && !trimmed.startsWith('ws://')) {
+      return 'Use a WSS URL';
+    }
+    if (trimmed.startsWith('ws://') && !_allowInsecureTransport) {
+      return 'Enable WS dev for insecure transport';
     }
     return null;
   }
@@ -1069,12 +1228,14 @@ class _AccountDialogState extends State<AccountDialog> {
       name: _nameController.text.trim(),
       displayName: _displayNameController.text.trim(),
       username: _usernameController.text.trim(),
+      password: _passwordController.text,
       domain: _domainController.text.trim(),
       wssServer: _wssController.text.trim(),
       stunServer: _stunController.text.trim(),
       turnServer: _turnController.text.trim(),
       hasPassword: _passwordController.text.isNotEmpty ||
           (existing?.hasPassword ?? false),
+      allowInsecureTransport: _allowInsecureTransport,
       enabled: _enabled,
       autoRegister: _autoRegister,
       status: existing?.status ?? RegistrationStatus.offline,
@@ -1264,82 +1425,6 @@ class InfoRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-enum RegistrationStatus {
-  offline,
-  registering,
-  registered,
-  failed;
-
-  String get label {
-    return switch (this) {
-      RegistrationStatus.offline => 'Offline',
-      RegistrationStatus.registering => 'Registering',
-      RegistrationStatus.registered => 'Registered',
-      RegistrationStatus.failed => 'Failed',
-    };
-  }
-}
-
-class WebRtcAccount {
-  const WebRtcAccount({
-    required this.id,
-    required this.name,
-    required this.displayName,
-    required this.username,
-    required this.domain,
-    required this.wssServer,
-    required this.stunServer,
-    required this.turnServer,
-    required this.hasPassword,
-    required this.enabled,
-    required this.autoRegister,
-    required this.status,
-  });
-
-  final String id;
-  final String name;
-  final String displayName;
-  final String username;
-  final String domain;
-  final String wssServer;
-  final String stunServer;
-  final String turnServer;
-  final bool hasPassword;
-  final bool enabled;
-  final bool autoRegister;
-  final RegistrationStatus status;
-
-  WebRtcAccount copyWith({
-    String? id,
-    String? name,
-    String? displayName,
-    String? username,
-    String? domain,
-    String? wssServer,
-    String? stunServer,
-    String? turnServer,
-    bool? hasPassword,
-    bool? enabled,
-    bool? autoRegister,
-    RegistrationStatus? status,
-  }) {
-    return WebRtcAccount(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      displayName: displayName ?? this.displayName,
-      username: username ?? this.username,
-      domain: domain ?? this.domain,
-      wssServer: wssServer ?? this.wssServer,
-      stunServer: stunServer ?? this.stunServer,
-      turnServer: turnServer ?? this.turnServer,
-      hasPassword: hasPassword ?? this.hasPassword,
-      enabled: enabled ?? this.enabled,
-      autoRegister: autoRegister ?? this.autoRegister,
-      status: status ?? this.status,
     );
   }
 }
