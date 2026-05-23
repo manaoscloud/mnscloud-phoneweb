@@ -193,22 +193,15 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                           ),
                           const SizedBox(width: 20),
                           Expanded(
-                            child: ListView(
-                              children: [
-                                DialerPanel(
-                                  selectedAccount: _selectedAccount,
-                                  dialNumber: _dialNumber,
-                                  onAppend: _appendDial,
-                                  onBackspace: _backspaceDial,
-                                  onClear: _clearDial,
-                                  onCall: _simulateCall,
-                                ),
-                                const SizedBox(height: 20),
-                                BottomPanels(
-                                  accountCount: _accounts.length,
-                                  lastEvent: _lastEvent,
-                                ),
-                              ],
+                            child: WorkspacePanels(
+                              selectedAccount: _selectedAccount,
+                              dialNumber: _dialNumber,
+                              accountCount: _accounts.length,
+                              lastEvent: _lastEvent,
+                              onAppend: _appendDial,
+                              onBackspace: _backspaceDial,
+                              onClear: _clearDial,
+                              onCall: _simulateCall,
                             ),
                           ),
                         ],
@@ -248,6 +241,83 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       const SizedBox(height: 16),
       BottomPanels(accountCount: _accounts.length, lastEvent: _lastEvent),
     ];
+  }
+}
+
+class WorkspacePanels extends StatelessWidget {
+  const WorkspacePanels({
+    required this.selectedAccount,
+    required this.dialNumber,
+    required this.accountCount,
+    required this.lastEvent,
+    required this.onAppend,
+    required this.onBackspace,
+    required this.onClear,
+    required this.onCall,
+    super.key,
+  });
+
+  final WebRtcAccount? selectedAccount;
+  final String dialNumber;
+  final int accountCount;
+  final String lastEvent;
+  final ValueChanged<String> onAppend;
+  final VoidCallback onBackspace;
+  final VoidCallback onClear;
+  final VoidCallback onCall;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 1080) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: DialerPanel(
+                  selectedAccount: selectedAccount,
+                  dialNumber: dialNumber,
+                  onAppend: onAppend,
+                  onBackspace: onBackspace,
+                  onClear: onClear,
+                  onCall: onCall,
+                ),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 360,
+                child: Column(
+                  children: [
+                    DiagnosticsPanel(
+                      accountCount: accountCount,
+                      lastEvent: lastEvent,
+                    ),
+                    const SizedBox(height: 16),
+                    const Expanded(child: CallHistoryPanel()),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        return ListView(
+          children: [
+            DialerPanel(
+              selectedAccount: selectedAccount,
+              dialNumber: dialNumber,
+              onAppend: onAppend,
+              onBackspace: onBackspace,
+              onClear: onClear,
+              onCall: onCall,
+            ),
+            const SizedBox(height: 16),
+            BottomPanels(accountCount: accountCount, lastEvent: lastEvent),
+          ],
+        );
+      },
+    );
   }
 }
 
