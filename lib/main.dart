@@ -53,10 +53,12 @@ class PhoneWebHomePage extends StatefulWidget {
 
 class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final List<WebRtcAccount> _accounts = [];
+  final List<PhoneContact> _contacts = [];
   late final PhoneWebVoipController _voip;
   String? _selectedAccountId;
   String _dialNumber = '';
   String _lastEvent = 'Ready';
+  int _mobileTabIndex = 0;
 
   @override
   void initState() {
@@ -180,9 +182,63 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     await _voip.makeCall(_dialNumber);
   }
 
+  Future<void> _openContactDialog({PhoneContact? contact}) async {
+    final result = await showDialog<PhoneContact>(
+      context: context,
+      builder: (context) => ContactDialog(contact: contact),
+    );
+    if (result == null) return;
+
+    setState(() {
+      final index = _contacts.indexWhere((item) => item.id == result.id);
+      if (index >= 0) {
+        _contacts[index] = result;
+      } else {
+        _contacts.add(result);
+      }
+      _lastEvent = '${result.name} saved';
+    });
+  }
+
+  void _dialContact(PhoneContact contact) {
+    setState(() {
+      _dialNumber = contact.number;
+      _mobileTabIndex = 0;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
+    if (width < 640) {
+      return MobilePhoneShell(
+        accounts: _accounts,
+        contacts: _contacts,
+        selectedAccount: _selectedAccount,
+        dialNumber: _dialNumber,
+        voip: _voip,
+        currentIndex: _mobileTabIndex,
+        lastEvent: _lastEvent,
+        onTabChanged: (index) => setState(() => _mobileTabIndex = index),
+        onAppend: _appendDial,
+        onBackspace: _backspaceDial,
+        onClear: _clearDial,
+        onCall: _makeCall,
+        onAddAccount: () => _openAccountDialog(),
+        onEditAccount: (account) => _openAccountDialog(account: account),
+        onRemoveAccount: _removeAccount,
+        onSelectAccount: (account) {
+          setState(() {
+            _selectedAccountId = account.id;
+          });
+        },
+        onToggleRegistration: _toggleRegistration,
+        onAddContact: () => _openContactDialog(),
+        onEditContact: (contact) => _openContactDialog(contact: contact),
+        onDialContact: _dialContact,
+      );
+    }
+
     final compact = width < 920;
 
     return Scaffold(
@@ -363,6 +419,754 @@ class WorkspacePanels extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class PhoneContact {
+  PhoneContact({
+    required this.id,
+    required this.name,
+    required this.number,
+    this.company = '',
+  });
+
+  final String id;
+  final String name;
+  final String number;
+  final String company;
+}
+
+class MobilePhoneShell extends StatelessWidget {
+  const MobilePhoneShell({
+    required this.accounts,
+    required this.contacts,
+    required this.selectedAccount,
+    required this.dialNumber,
+    required this.voip,
+    required this.currentIndex,
+    required this.lastEvent,
+    required this.onTabChanged,
+    required this.onAppend,
+    required this.onBackspace,
+    required this.onClear,
+    required this.onCall,
+    required this.onAddAccount,
+    required this.onEditAccount,
+    required this.onRemoveAccount,
+    required this.onSelectAccount,
+    required this.onToggleRegistration,
+    required this.onAddContact,
+    required this.onEditContact,
+    required this.onDialContact,
+    super.key,
+  });
+
+  final List<WebRtcAccount> accounts;
+  final List<PhoneContact> contacts;
+  final WebRtcAccount? selectedAccount;
+  final String dialNumber;
+  final PhoneWebVoipController voip;
+  final int currentIndex;
+  final String lastEvent;
+  final ValueChanged<int> onTabChanged;
+  final ValueChanged<String> onAppend;
+  final VoidCallback onBackspace;
+  final VoidCallback onClear;
+  final VoidCallback onCall;
+  final VoidCallback onAddAccount;
+  final ValueChanged<WebRtcAccount> onEditAccount;
+  final ValueChanged<WebRtcAccount> onRemoveAccount;
+  final ValueChanged<WebRtcAccount> onSelectAccount;
+  final ValueChanged<WebRtcAccount> onToggleRegistration;
+  final VoidCallback onAddContact;
+  final ValueChanged<PhoneContact> onEditContact;
+  final ValueChanged<PhoneContact> onDialContact;
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = [
+      MobileDialerView(
+        dialNumber: dialNumber,
+        voip: voip,
+        selectedAccount: selectedAccount,
+        onAppend: onAppend,
+        onBackspace: onBackspace,
+        onClear: onClear,
+        onCall: onCall,
+      ),
+      MobileContactsView(
+        contacts: contacts,
+        onAddContact: onAddContact,
+        onEditContact: onEditContact,
+        onDialContact: onDialContact,
+      ),
+      const MobileHistoryView(),
+      const MobileMessagesView(),
+    ];
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF151515),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFFFA000),
+          secondary: Color(0xFF7AA43A),
+          surface: Color(0xFF1C1C1C),
+          surfaceContainerHighest: Color(0xFF252525),
+          onSurface: Colors.white,
+          onSurfaceVariant: Color(0xFFB8B8B8),
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF151515),
+        body: SafeArea(
+          child: Column(
+            children: [
+              MobileTopBar(
+                account: selectedAccount,
+                accountCount: accounts.length,
+                onAccounts: () => _showAccountsSheet(context),
+              ),
+              Expanded(child: pages[currentIndex]),
+            ],
+          ),
+        ),
+        bottomNavigationBar: NavigationBarTheme(
+          data: NavigationBarThemeData(
+            indicatorColor: Colors.transparent,
+            labelTextStyle: WidgetStateProperty.resolveWith(
+              (states) => TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: states.contains(WidgetState.selected)
+                    ? const Color(0xFFFFA000)
+                    : const Color(0xFF9E9E9E),
+              ),
+            ),
+            iconTheme: WidgetStateProperty.resolveWith(
+              (states) => IconThemeData(
+                color: states.contains(WidgetState.selected)
+                    ? const Color(0xFFFFA000)
+                    : const Color(0xFF9E9E9E),
+              ),
+            ),
+          ),
+          child: NavigationBar(
+            height: 78,
+            backgroundColor: const Color(0xFF101010),
+            selectedIndex: currentIndex,
+            onDestinationSelected: onTabChanged,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dialpad),
+                label: 'Telefone',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                label: 'Contatos',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history),
+                label: 'Historico',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.chat_bubble_outline),
+                label: 'Mensagens',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAccountsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF202020),
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Accounts',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        onAddAccount();
+                      },
+                      icon: const Icon(Icons.add),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (accounts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 28),
+                    child: Center(child: Text('No WebRTC accounts')),
+                  )
+                else
+                  ...accounts.map(
+                    (account) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(account.name),
+                      subtitle: Text('${account.username}@${account.domain}'),
+                      leading: Icon(
+                        selectedAccount?.id == account.id
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                      ),
+                      trailing: Wrap(
+                        children: [
+                          IconButton(
+                            onPressed: () => onToggleRegistration(account),
+                            icon: Icon(
+                              account.status == RegistrationStatus.registered
+                                  ? Icons.logout
+                                  : Icons.login,
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              onEditAccount(account);
+                            },
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                        ],
+                      ),
+                      onTap: () {
+                        onSelectAccount(account);
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class MobileTopBar extends StatelessWidget {
+  const MobileTopBar({
+    required this.account,
+    required this.accountCount,
+    required this.onAccounts,
+    super.key,
+  });
+
+  final WebRtcAccount? account;
+  final int accountCount;
+  final VoidCallback onAccounts;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentAccount = account;
+    final registered = currentAccount?.status == RegistrationStatus.registered;
+
+    return Container(
+      height: 118,
+      padding: const EdgeInsets.fromLTRB(22, 14, 22, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF181818),
+        border: Border(bottom: BorderSide(color: Color(0xFF333333))),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(
+                _timeLabel(TimeOfDay.now()),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.person, size: 20),
+              const Spacer(),
+              const Icon(Icons.signal_cellular_alt, size: 22),
+              const SizedBox(width: 10),
+              const Icon(Icons.wifi, size: 24),
+              const SizedBox(width: 10),
+              const Icon(Icons.battery_6_bar, size: 28),
+            ],
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    onPressed: onAccounts,
+                    icon: const Icon(Icons.menu, size: 32),
+                  ),
+                  if (accountCount == 0)
+                    const Positioned(
+                      right: 7,
+                      top: 8,
+                      child: CircleAvatar(
+                        radius: 8,
+                        backgroundColor: Colors.red,
+                        child: Text('!', style: TextStyle(fontSize: 11)),
+                      ),
+                    ),
+                ],
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Text(
+                      registered ? 'Registrado' : 'Sem Servico',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      currentAccount == null
+                          ? 'Vazio'
+                          : '${currentAccount.username}@${currentAccount.domain}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: const Color(0xFFB8B8B8),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 48),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _timeLabel(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+}
+
+class MobileDialerView extends StatelessWidget {
+  const MobileDialerView({
+    required this.dialNumber,
+    required this.voip,
+    required this.selectedAccount,
+    required this.onAppend,
+    required this.onBackspace,
+    required this.onClear,
+    required this.onCall,
+    super.key,
+  });
+
+  final String dialNumber;
+  final PhoneWebVoipController voip;
+  final WebRtcAccount? selectedAccount;
+  final ValueChanged<String> onAppend;
+  final VoidCallback onBackspace;
+  final VoidCallback onClear;
+  final VoidCallback onCall;
+
+  @override
+  Widget build(BuildContext context) {
+    final canCall = selectedAccount != null &&
+        voip.registrationStatus == RegistrationStatus.registered &&
+        dialNumber.trim().isNotEmpty &&
+        !voip.hasActiveCall;
+
+    return Column(
+      children: [
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: dialNumber.isEmpty
+                    ? const Column(
+                        key: ValueKey('brand'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.wifi_calling_3_outlined,
+                            size: 104,
+                            color: Color(0xFFD0D0D0),
+                          ),
+                          SizedBox(height: 18),
+                          Text(
+                            'MNSCloud',
+                            style: TextStyle(
+                              fontSize: 42,
+                              color: Color(0xFFD0D0D0),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        dialNumber,
+                        key: const ValueKey('number'),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 42,
+                          fontWeight: FontWeight.w300,
+                          letterSpacing: 0,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFF8A8A8A)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 22, 8, 8),
+          child: MobileDialPad(onAppend: onAppend),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(26, 0, 26, 20),
+          child: Row(
+            children: [
+              Expanded(
+                child: MobileUtilityButton(
+                  icon: Icons.voicemail,
+                  label: 'VM',
+                  onPressed: () => onAppend('*97'),
+                ),
+              ),
+              SizedBox(
+                width: 74,
+                height: 74,
+                child: FilledButton(
+                  onPressed: canCall ? onCall : null,
+                  style: FilledButton.styleFrom(
+                    shape: const CircleBorder(),
+                    backgroundColor: const Color(0xFF557D25),
+                    disabledBackgroundColor: const Color(0xFF2E3A25),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Icon(Icons.call, size: 34),
+                ),
+              ),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: dialNumber.isEmpty ? null : onBackspace,
+                    icon: const Icon(Icons.backspace_outlined, size: 34),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (voip.hasActiveCall)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+            child: ActiveCallControls(voip: voip),
+          ),
+      ],
+    );
+  }
+}
+
+class MobileDialPad extends StatelessWidget {
+  const MobileDialPad({required this.onAppend, super.key});
+
+  final ValueChanged<String> onAppend;
+
+  static const keys = [
+    ('1', ''),
+    ('2', 'ABC'),
+    ('3', 'DEF'),
+    ('4', 'GHI'),
+    ('5', 'JKL'),
+    ('6', 'MNO'),
+    ('7', 'PQRS'),
+    ('8', 'TUV'),
+    ('9', 'WXYZ'),
+    ('*', ''),
+    ('0', '+'),
+    ('#', ''),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: keys.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisExtent: 86,
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
+      ),
+      itemBuilder: (context, index) {
+        final key = keys[index];
+        return TextButton(
+          onPressed: () => onAppend(key.$1),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                key.$1,
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w300,
+                  height: 1,
+                ),
+              ),
+              SizedBox(
+                height: 20,
+                child: Text(
+                  key.$2,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFB8B8B8),
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class MobileUtilityButton extends StatelessWidget {
+  const MobileUtilityButton({
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 34, color: Colors.white),
+          Text(label, style: const TextStyle(color: Color(0xFFB8B8B8))),
+        ],
+      ),
+    );
+  }
+}
+
+class MobileContactsView extends StatelessWidget {
+  const MobileContactsView({
+    required this.contacts,
+    required this.onAddContact,
+    required this.onEditContact,
+    required this.onDialContact,
+    super.key,
+  });
+
+  final List<PhoneContact> contacts;
+  final VoidCallback onAddContact;
+  final ValueChanged<PhoneContact> onEditContact;
+  final ValueChanged<PhoneContact> onDialContact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(
+                'Contatos',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: onAddContact,
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'Buscar contato',
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: const Color(0xFF252525),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: contacts.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.contacts_outlined,
+                          size: 72,
+                          color: Color(0xFFB8B8B8),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Nenhum contato'),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Adicione contatos para discar mais rapido.',
+                          style: TextStyle(color: Color(0xFFB8B8B8)),
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton.icon(
+                          onPressed: onAddContact,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Adicionar contato'),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: contacts.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(color: Color(0xFF333333)),
+                    itemBuilder: (context, index) {
+                      final contact = contacts[index];
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFF2D3A35),
+                          child: Text(
+                              contact.name.isEmpty ? '?' : contact.name[0]),
+                        ),
+                        title: Text(contact.name),
+                        subtitle: Text(
+                          contact.company.isEmpty
+                              ? contact.number
+                              : '${contact.company} · ${contact.number}',
+                        ),
+                        trailing: Wrap(
+                          children: [
+                            IconButton(
+                              onPressed: () => onEditContact(contact),
+                              icon: const Icon(Icons.edit_outlined),
+                            ),
+                            IconButton(
+                              onPressed: () => onDialContact(contact),
+                              icon: const Icon(Icons.call_outlined),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class MobileHistoryView extends StatelessWidget {
+  const MobileHistoryView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MobileEmptyTab(
+      icon: Icons.history,
+      title: 'Historico vazio',
+      message: 'As chamadas realizadas e recebidas aparecerao aqui.',
+    );
+  }
+}
+
+class MobileMessagesView extends StatelessWidget {
+  const MobileMessagesView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MobileEmptyTab(
+      icon: Icons.chat_bubble_outline,
+      title: 'Mensagens',
+      message: 'Correio de voz e mensagens ficarao disponiveis aqui.',
+    );
+  }
+}
+
+class MobileEmptyTab extends StatelessWidget {
+  const MobileEmptyTab({
+    required this.icon,
+    required this.title,
+    required this.message,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 76, color: const Color(0xFFB8B8B8)),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFFB8B8B8)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -961,6 +1765,118 @@ class CallHistoryPanel extends StatelessWidget {
             message: 'Completed calls will appear here.',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ContactDialog extends StatefulWidget {
+  const ContactDialog({this.contact, super.key});
+
+  final PhoneContact? contact;
+
+  @override
+  State<ContactDialog> createState() => _ContactDialogState();
+}
+
+class _ContactDialogState extends State<ContactDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _numberController;
+  late final TextEditingController _companyController;
+
+  @override
+  void initState() {
+    super.initState();
+    final contact = widget.contact;
+    _nameController = TextEditingController(text: contact?.name ?? '');
+    _numberController = TextEditingController(text: contact?.number ?? '');
+    _companyController = TextEditingController(text: contact?.company ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _numberController.dispose();
+    _companyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(18),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.contact == null ? 'Add contact' : 'Edit contact',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 18),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: _required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _numberController,
+                  decoration: const InputDecoration(labelText: 'Phone number'),
+                  keyboardType: TextInputType.phone,
+                  validator: _required,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _companyController,
+                  decoration: const InputDecoration(labelText: 'Company'),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _save,
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _required(String? value) {
+    return value == null || value.trim().isEmpty ? 'Required field' : null;
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    final existing = widget.contact;
+    Navigator.pop(
+      context,
+      PhoneContact(
+        id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
+        name: _nameController.text.trim(),
+        number: _numberController.text.trim(),
+        company: _companyController.text.trim(),
       ),
     );
   }
