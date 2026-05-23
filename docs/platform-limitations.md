@@ -12,6 +12,7 @@ Expected MVP behavior:
 - incoming calls while the app is running
 - microphone permission
 - speaker/mute where supported by platform plugins
+- native contact read permission and address book sync
 
 Important limitations:
 
@@ -19,6 +20,7 @@ Important limitations:
 - background execution is affected by battery optimization
 - persistent WebSocket registration may be suspended by the OS
 - reliable production incoming calls usually require FCM plus native calling UI
+- the public app reads contacts only after explicit user permission
 
 Future Android work:
 
@@ -36,6 +38,7 @@ Expected MVP behavior:
 - outgoing calls
 - incoming calls while the app is active/running
 - microphone permission
+- native contact read permission and address book sync
 
 Important limitations:
 
@@ -43,6 +46,7 @@ Important limitations:
 - closed-app incoming calls require APNs/PushKit and CallKit
 - PushKit requires a server capable of sending VoIP pushes
 - the initial backend-independent app cannot guarantee closed-app incoming calls
+- users may grant limited contact access on newer iOS versions
 
 Future iOS work:
 
@@ -66,6 +70,7 @@ Important limitations:
 - background behavior depends on browser policies
 - audio device selection varies by browser
 - push and incoming call UX are browser-dependent
+- browsers do not expose the native macOS/iCloud address book to Flutter Web
 
 ## Windows, macOS, Linux
 
@@ -73,6 +78,7 @@ Expected MVP behavior:
 
 - WebRTC registration and calls where `flutter_webrtc` supports the platform
 - desktop microphone permissions and audio route behavior by operating system
+- native macOS contact read permission and address book sync
 
 Important limitations:
 
@@ -80,6 +86,8 @@ Important limitations:
 - audio device enumeration and switching can vary
 - auto-start/background behavior must be designed per OS
 - code signing/notarization may be required for distribution
+- Windows and Linux native address book sync are not enabled yet; they can be
+  added later through dedicated platform adapters
 
 ## Product Statement
 
@@ -90,4 +98,3 @@ Incoming calls are supported while the app is running and registered.
 Reliable closed-app incoming calls require platform push integrations and a
 provider or gateway capable of sending push notifications.
 ```
-

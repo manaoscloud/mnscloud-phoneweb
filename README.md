@@ -29,6 +29,7 @@ Initial scope:
 - answer, reject, hang up
 - mute, hold, DTMF, speaker route where supported
 - local call history
+- native address book sync on Android, iOS, and macOS
 - secure credential storage
 - diagnostics and sanitized logs
 
@@ -65,6 +66,7 @@ rules. See [Platform Limitations](docs/platform-limitations.md).
 - Dart
 - `flutter_webrtc`
 - `sip_ua`
+- `flutter_contacts`
 - `flutter_secure_storage`
 - `permission_handler`
 - `go_router`
@@ -140,6 +142,7 @@ mnscloud-phoneweb/
     main.dart
     src/
       account/
+      contacts/
       voip/
       call/
       call_history/
@@ -172,6 +175,7 @@ Infrastructure adapters
   |
   +-- sip_ua WebRTC engine
   +-- flutter_webrtc media layer
+  +-- flutter_contacts native address book adapter
   +-- secure credential storage
   +-- local call history
   +-- diagnostics logger

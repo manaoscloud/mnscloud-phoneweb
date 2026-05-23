@@ -7,7 +7,7 @@ import '../account/webrtc_account.dart';
 class PhoneWebVoipController extends ChangeNotifier
     implements SipUaHelperListener {
   PhoneWebVoipController({SIPUAHelper? helper})
-      : _helper = helper ?? SIPUAHelper() {
+    : _helper = helper ?? SIPUAHelper() {
     _helper.addSipUaHelperListener(this);
   }
 
@@ -73,8 +73,9 @@ class PhoneWebVoipController extends ChangeNotifier
       ..host = account.domain
       ..authorizationUser = account.username
       ..password = password
-      ..displayName =
-          account.displayName.isEmpty ? account.username : account.displayName
+      ..displayName = account.displayName.isEmpty
+          ? account.username
+          : account.displayName
       ..userAgent = 'MNSCloud PhoneWeb'
       ..dtmfMode = DtmfMode.RFC2833
       ..contact_uri = 'sip:${account.username}@${account.domain}'
@@ -115,8 +116,11 @@ class PhoneWebVoipController extends ChangeNotifier
 
     final target = _normalizeTarget(destination, currentAccount.domain);
     final stream = await _microphoneStream();
-    final started =
-        await _helper.call(target, voiceOnly: true, mediaStream: stream);
+    final started = await _helper.call(
+      target,
+      voiceOnly: true,
+      mediaStream: stream,
+    );
     _setEvent(started ? 'Calling $target' : 'Call could not be started');
     notifyListeners();
   }

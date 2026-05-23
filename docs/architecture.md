@@ -32,7 +32,7 @@ domain
 
 infrastructure
   sip_ua adapter, flutter_webrtc adapter, secure storage, local database,
-  permission adapters, diagnostics adapters
+  native contacts adapter, permission adapters, diagnostics adapters
 ```
 
 ## Dependency Direction
@@ -60,6 +60,12 @@ call
 
 call_history
   Local call history entities and persistence.
+
+contacts
+  Local contact model, native address book repository, platform permission
+  handling, and UI sync actions. Android, iOS, and macOS use
+  `flutter_contacts`; Web returns an explicit unsupported result because
+  browsers do not expose the operating system address book.
 
 settings
   App preferences and future white-label/runtime settings.
@@ -104,6 +110,14 @@ SipUaWebRtcEngine
   |
   +--> sip_ua
   +--> flutter_webrtc
+
+Contacts Screen
+  |
+  v
+NativeContactsRepository
+  |
+  +--> flutter_contacts on Android, iOS, macOS
+  +--> unsupported adapter on Web, Windows, Linux
 ```
 
 ## Engine Abstraction
@@ -171,4 +185,3 @@ UnsupportedProviderConfiguration
 ```
 
 Raw plugin errors must be sanitized before display, logging, or export.
-

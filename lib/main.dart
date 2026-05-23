@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'src/account/webrtc_account.dart';
+import 'src/contacts/native_contacts_repository.dart';
+import 'src/contacts/phone_contact.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
 
 void main() {
@@ -32,8 +34,9 @@ ThemeData _phoneWebTheme(Brightness brightness) {
 
   return ThemeData(
     colorScheme: colorScheme,
-    scaffoldBackgroundColor:
-        dark ? const Color(0xFF151515) : const Color(0xFFF7F8F5),
+    scaffoldBackgroundColor: dark
+        ? const Color(0xFF151515)
+        : const Color(0xFFF7F8F5),
     useMaterial3: true,
     inputDecorationTheme: InputDecorationTheme(
       border: const OutlineInputBorder(),
@@ -62,11 +65,15 @@ class PhoneWebHomePage extends StatefulWidget {
 class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final List<WebRtcAccount> _accounts = [];
   final List<PhoneContact> _contacts = [];
+  final NativeContactsRepository _contactsRepository =
+      NativeContactsRepository();
   late final PhoneWebVoipController _voip;
   String? _selectedAccountId;
   String _dialNumber = '';
   String _lastEvent = 'Ready';
   int _mobileTabIndex = 0;
+  bool _contactsSyncing = false;
+  String _contactsStatus = 'Agenda local';
 
   @override
   void initState() {
@@ -142,8 +149,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     setState(() {
       final activeAccount = _voip.account;
       if (activeAccount != null) {
-        final index =
-            _accounts.indexWhere((item) => item.id == activeAccount.id);
+        final index = _accounts.indexWhere(
+          (item) => item.id == activeAccount.id,
+        );
         if (index >= 0) {
           _accounts[index] = _accounts[index].copyWith(
             status: _voip.registrationStatus,
@@ -215,6 +223,38 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
+  Future<void> _syncNativeContacts() async {
+    if (_contactsSyncing) return;
+
+    setState(() {
+      _contactsSyncing = true;
+      _contactsStatus = 'Sincronizando agenda...';
+    });
+
+    final result = await _contactsRepository.loadContacts();
+    if (!mounted) return;
+
+    setState(() {
+      _contactsSyncing = false;
+      _contactsStatus = result.message;
+      _lastEvent = result.message;
+
+      if (result.status == NativeContactsStatus.loaded) {
+        final manualContacts = _contacts
+            .where((contact) => contact.source == PhoneContactSource.manual)
+            .toList();
+        _contacts
+          ..clear()
+          ..addAll(manualContacts)
+          ..addAll(result.contacts);
+      }
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -244,6 +284,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onAddContact: () => _openContactDialog(),
         onEditContact: (contact) => _openContactDialog(contact: contact),
         onDialContact: _dialContact,
+        onSyncContacts: _syncNativeContacts,
+        contactsSyncing: _contactsSyncing,
+        contactsStatus: _contactsStatus,
       );
     }
 
@@ -263,27 +306,40 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
               const SizedBox(height: 20),
               Expanded(
                 child: compact
-                    ? ListView(
-                        children: _buildPanels(compact: true),
-                      )
+                    ? ListView(children: _buildPanels(compact: true))
                     : Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SizedBox(
                             width: 360,
-                            child: AccountPanel(
-                              accounts: _accounts,
-                              selectedAccountId: _selectedAccount?.id,
-                              onAddAccount: () => _openAccountDialog(),
-                              onEditAccount: (account) =>
-                                  _openAccountDialog(account: account),
-                              onRemoveAccount: _removeAccount,
-                              onSelectAccount: (account) {
-                                setState(() {
-                                  _selectedAccountId = account.id;
-                                });
-                              },
-                              onToggleRegistration: _toggleRegistration,
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: AccountPanel(
+                                    accounts: _accounts,
+                                    selectedAccountId: _selectedAccount?.id,
+                                    onAddAccount: () => _openAccountDialog(),
+                                    onEditAccount: (account) =>
+                                        _openAccountDialog(account: account),
+                                    onRemoveAccount: _removeAccount,
+                                    onSelectAccount: (account) {
+                                      setState(() {
+                                        _selectedAccountId = account.id;
+                                      });
+                                    },
+                                    onToggleRegistration: _toggleRegistration,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ContactsSummaryPanel(
+                                  contacts: _contacts,
+                                  contactsSyncing: _contactsSyncing,
+                                  contactsStatus: _contactsStatus,
+                                  onAddContact: () => _openContactDialog(),
+                                  onSyncContacts: _syncNativeContacts,
+                                  onDialContact: _dialContact,
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 20),
@@ -324,6 +380,15 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           });
         },
         onToggleRegistration: _toggleRegistration,
+      ),
+      const SizedBox(height: 16),
+      ContactsSummaryPanel(
+        contacts: _contacts,
+        contactsSyncing: _contactsSyncing,
+        contactsStatus: _contactsStatus,
+        onAddContact: () => _openContactDialog(),
+        onSyncContacts: _syncNativeContacts,
+        onDialContact: _dialContact,
       ),
       const SizedBox(height: 16),
       DialerPanel(
@@ -431,20 +496,6 @@ class WorkspacePanels extends StatelessWidget {
   }
 }
 
-class PhoneContact {
-  PhoneContact({
-    required this.id,
-    required this.name,
-    required this.number,
-    this.company = '',
-  });
-
-  final String id;
-  final String name;
-  final String number;
-  final String company;
-}
-
 class MobilePhoneShell extends StatelessWidget {
   const MobilePhoneShell({
     required this.accounts,
@@ -467,6 +518,9 @@ class MobilePhoneShell extends StatelessWidget {
     required this.onAddContact,
     required this.onEditContact,
     required this.onDialContact,
+    required this.onSyncContacts,
+    required this.contactsSyncing,
+    required this.contactsStatus,
     super.key,
   });
 
@@ -490,6 +544,9 @@ class MobilePhoneShell extends StatelessWidget {
   final VoidCallback onAddContact;
   final ValueChanged<PhoneContact> onEditContact;
   final ValueChanged<PhoneContact> onDialContact;
+  final VoidCallback onSyncContacts;
+  final bool contactsSyncing;
+  final String contactsStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -511,6 +568,9 @@ class MobilePhoneShell extends StatelessWidget {
         onAddContact: onAddContact,
         onEditContact: onEditContact,
         onDialContact: onDialContact,
+        onSyncContacts: onSyncContacts,
+        contactsSyncing: contactsSyncing,
+        contactsStatus: contactsStatus,
       ),
       const MobileHistoryView(),
       const MobileMessagesView(),
@@ -556,10 +616,7 @@ class MobilePhoneShell extends StatelessWidget {
           selectedIndex: currentIndex,
           onDestinationSelected: onTabChanged,
           destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.dialpad),
-              label: 'Telefone',
-            ),
+            NavigationDestination(icon: Icon(Icons.dialpad), label: 'Telefone'),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
               label: 'Contatos',
@@ -596,8 +653,8 @@ class MobilePhoneShell extends StatelessWidget {
                     Text(
                       'Accounts',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -691,9 +748,9 @@ class MobileTopBar extends StatelessWidget {
             children: [
               Text(
                 _timeLabel(TimeOfDay.now()),
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(width: 6),
               const Icon(Icons.person, size: 20),
@@ -743,8 +800,8 @@ class MobileTopBar extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -787,7 +844,8 @@ class MobileDialerView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final canCall = selectedAccount != null &&
+    final canCall =
+        selectedAccount != null &&
         voip.registrationStatus == RegistrationStatus.registered &&
         dialNumber.trim().isNotEmpty &&
         !voip.hasActiveCall;
@@ -799,33 +857,33 @@ class MobileDialerView extends StatelessWidget {
         final dialKeyHeight = tightHeight
             ? 56.0
             : compactHeight
-                ? 68.0
-                : 86.0;
+            ? 68.0
+            : 86.0;
         final callButtonSize = tightHeight
             ? 54.0
             : compactHeight
-                ? 60.0
-                : 74.0;
+            ? 60.0
+            : 74.0;
         final brandIconSize = tightHeight
             ? 48.0
             : compactHeight
-                ? 72.0
-                : 104.0;
+            ? 72.0
+            : 104.0;
         final brandFontSize = tightHeight
             ? 24.0
             : compactHeight
-                ? 32.0
-                : 42.0;
+            ? 32.0
+            : 42.0;
         final numberFontSize = tightHeight
             ? 30.0
             : compactHeight
-                ? 34.0
-                : 42.0;
+            ? 34.0
+            : 42.0;
         final contentPadding = tightHeight
             ? 6.0
             : compactHeight
-                ? 12.0
-                : 24.0;
+            ? 12.0
+            : 24.0;
 
         return Column(
           children: [
@@ -846,11 +904,12 @@ class MobileDialerView extends StatelessWidget {
                                 color: colorScheme.onSurfaceVariant,
                               ),
                               SizedBox(
-                                  height: tightHeight
-                                      ? 6
-                                      : compactHeight
-                                          ? 8
-                                          : 18),
+                                height: tightHeight
+                                    ? 6
+                                    : compactHeight
+                                    ? 8
+                                    : 18,
+                              ),
                               Text(
                                 'MNSCloud',
                                 style: TextStyle(
@@ -884,8 +943,8 @@ class MobileDialerView extends StatelessWidget {
                 tightHeight
                     ? 4
                     : compactHeight
-                        ? 8
-                        : 22,
+                    ? 8
+                    : 22,
                 8,
                 4,
               ),
@@ -902,8 +961,8 @@ class MobileDialerView extends StatelessWidget {
                 tightHeight
                     ? 6
                     : compactHeight
-                        ? 8
-                        : 20,
+                    ? 8
+                    : 20,
               ),
               child: Row(
                 children: [
@@ -958,11 +1017,7 @@ class MobileDialerView extends StatelessWidget {
 }
 
 class MobileDialPad extends StatelessWidget {
-  const MobileDialPad({
-    required this.onAppend,
-    this.keyHeight = 86,
-    super.key,
-  });
+  const MobileDialPad({required this.onAppend, this.keyHeight = 86, super.key});
 
   final ValueChanged<String> onAppend;
   final double keyHeight;
@@ -1069,6 +1124,9 @@ class MobileContactsView extends StatelessWidget {
     required this.onAddContact,
     required this.onEditContact,
     required this.onDialContact,
+    required this.onSyncContacts,
+    required this.contactsSyncing,
+    required this.contactsStatus,
     super.key,
   });
 
@@ -1076,6 +1134,9 @@ class MobileContactsView extends StatelessWidget {
   final VoidCallback onAddContact;
   final ValueChanged<PhoneContact> onEditContact;
   final ValueChanged<PhoneContact> onDialContact;
+  final VoidCallback onSyncContacts;
+  final bool contactsSyncing;
+  final String contactsStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -1089,10 +1150,21 @@ class MobileContactsView extends StatelessWidget {
               Text(
                 'Contatos',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const Spacer(),
+              IconButton(
+                onPressed: contactsSyncing ? null : onSyncContacts,
+                tooltip: 'Sincronizar agenda do dispositivo',
+                icon: contactsSyncing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync_outlined),
+              ),
               IconButton(
                 onPressed: onAddContact,
                 icon: const Icon(Icons.person_add_alt_1_outlined),
@@ -1113,6 +1185,18 @@ class MobileContactsView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              contactsStatus,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Expanded(
             child: contacts.isEmpty
                 ? Center(
@@ -1133,6 +1217,20 @@ class MobileContactsView extends StatelessWidget {
                         ),
                         const SizedBox(height: 18),
                         FilledButton.icon(
+                          onPressed: contactsSyncing ? null : onSyncContacts,
+                          icon: contactsSyncing
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.sync_outlined),
+                          label: const Text('Sincronizar agenda'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
                           onPressed: onAddContact,
                           icon: const Icon(Icons.add),
                           label: const Text('Adicionar contato'),
@@ -1142,7 +1240,7 @@ class MobileContactsView extends StatelessWidget {
                   )
                 : ListView.separated(
                     itemCount: contacts.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (context, index) =>
                         Divider(color: colorScheme.outlineVariant),
                     itemBuilder: (context, index) {
                       final contact = contacts[index];
@@ -1152,7 +1250,8 @@ class MobileContactsView extends StatelessWidget {
                           backgroundColor: colorScheme.primaryContainer,
                           foregroundColor: colorScheme.onPrimaryContainer,
                           child: Text(
-                              contact.name.isEmpty ? '?' : contact.name[0]),
+                            contact.name.isEmpty ? '?' : contact.name[0],
+                          ),
                         ),
                         title: Text(contact.name),
                         subtitle: Text(
@@ -1160,8 +1259,15 @@ class MobileContactsView extends StatelessWidget {
                               ? contact.number
                               : '${contact.company} · ${contact.number}',
                         ),
+                        isThreeLine:
+                            contact.source == PhoneContactSource.native,
                         trailing: Wrap(
                           children: [
+                            if (contact.source == PhoneContactSource.native)
+                              const Tooltip(
+                                message: 'Contato sincronizado do dispositivo',
+                                child: Icon(Icons.contacts_outlined, size: 20),
+                              ),
                             IconButton(
                               onPressed: () => onEditContact(contact),
                               icon: const Icon(Icons.edit_outlined),
@@ -1233,9 +1339,9 @@ class MobileEmptyTab extends StatelessWidget {
             const SizedBox(height: 14),
             Text(
               title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             Text(
@@ -1266,8 +1372,9 @@ class AppHeader extends StatelessWidget {
 
     return Flex(
       direction: compact ? Axis.vertical : Axis.horizontal,
-      crossAxisAlignment:
-          compact ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      crossAxisAlignment: compact
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
@@ -1275,21 +1382,23 @@ class AppHeader extends StatelessWidget {
           children: [
             Text(
               'MNSCloud PhoneWeb',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
               '$accountCount WebRTC account${accountCount == 1 ? '' : 's'} configured',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
         SizedBox(
-            height: compact ? 14 : 0, width: compact ? double.infinity : 0),
+          height: compact ? 14 : 0,
+          width: compact ? double.infinity : 0,
+        ),
         FilledButton.icon(
           onPressed: onAddAccount,
           icon: const Icon(Icons.add),
@@ -1415,20 +1524,16 @@ class AccountTile extends StatelessWidget {
                           account.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           '${account.username}@${account.domain}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -1502,7 +1607,8 @@ class DialerPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canCall = selectedAccount != null &&
+    final canCall =
+        selectedAccount != null &&
         voip.registrationStatus == RegistrationStatus.registered &&
         dialNumber.trim().isNotEmpty &&
         !voip.hasActiveCall;
@@ -1512,10 +1618,7 @@ class DialerPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PanelTitle(
-            icon: Icons.dialpad_outlined,
-            title: 'Dialer',
-          ),
+          const PanelTitle(icon: Icons.dialpad_outlined, title: 'Dialer'),
           const SizedBox(height: 16),
           AccountContextBanner(account: selectedAccount),
           const SizedBox(height: 16),
@@ -1543,9 +1646,7 @@ class DialerPanel extends StatelessWidget {
                               dialNumber.isEmpty ? 'Enter number' : dialNumber,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
+                              style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
                                     color: dialNumber.isEmpty
                                         ? colorScheme.onSurfaceVariant
@@ -1659,9 +1760,9 @@ class DialPad extends StatelessWidget {
           onPressed: () => onAppend(value),
           child: Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
         );
       },
@@ -1676,8 +1777,9 @@ class ActiveCallControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final remote =
-        voip.remoteIdentity.isEmpty ? 'Unknown' : voip.remoteIdentity;
+    final remote = voip.remoteIdentity.isEmpty
+        ? 'Unknown'
+        : voip.remoteIdentity;
 
     return Container(
       width: double.infinity,
@@ -1696,9 +1798,9 @@ class ActiveCallControls extends StatelessWidget {
                 child: Text(
                   '$remote · ${voip.callState.name}',
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -1782,10 +1884,7 @@ class BottomPanels extends StatelessWidget {
       );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: panels,
-    );
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: panels);
   }
 }
 
@@ -1833,16 +1932,118 @@ class CallHistoryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PanelTitle(
-            icon: Icons.history,
-            title: 'Call history',
-          ),
+          PanelTitle(icon: Icons.history, title: 'Call history'),
           SizedBox(height: 12),
           EmptyState(
             icon: Icons.call_outlined,
             title: 'No calls yet',
             message: 'Completed calls will appear here.',
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class ContactsSummaryPanel extends StatelessWidget {
+  const ContactsSummaryPanel({
+    required this.contacts,
+    required this.contactsSyncing,
+    required this.contactsStatus,
+    required this.onAddContact,
+    required this.onSyncContacts,
+    required this.onDialContact,
+    super.key,
+  });
+
+  final List<PhoneContact> contacts;
+  final bool contactsSyncing;
+  final String contactsStatus;
+  final VoidCallback onAddContact;
+  final VoidCallback onSyncContacts;
+  final ValueChanged<PhoneContact> onDialContact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final previewContacts = contacts.take(4).toList();
+
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: PanelTitle(
+                  icon: Icons.contacts_outlined,
+                  title: 'Contacts',
+                ),
+              ),
+              IconButton(
+                onPressed: contactsSyncing ? null : onSyncContacts,
+                tooltip: 'Sync device contacts',
+                icon: contactsSyncing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync_outlined),
+              ),
+              IconButton(
+                onPressed: onAddContact,
+                tooltip: 'Add contact',
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            contactsStatus,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (previewContacts.isEmpty)
+            EmptyState(
+              icon: Icons.contacts_outlined,
+              title: 'No contacts yet',
+              message: 'Sync the device address book or add a local contact.',
+              actionLabel: 'Sync contacts',
+              onAction: contactsSyncing ? null : onSyncContacts,
+            )
+          else
+            ...previewContacts.map(
+              (contact) => ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                  child: Text(contact.name.isEmpty ? '?' : contact.name[0]),
+                ),
+                title: Text(
+                  contact.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  contact.number,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: IconButton(
+                  onPressed: () => onDialContact(contact),
+                  icon: const Icon(Icons.call_outlined),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1897,9 +2098,9 @@ class _ContactDialogState extends State<ContactDialog> {
               children: [
                 Text(
                   widget.contact == null ? 'Add contact' : 'Edit contact',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 18),
                 TextFormField(
@@ -1928,10 +2129,7 @@ class _ContactDialogState extends State<ContactDialog> {
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: _save,
-                      child: const Text('Save'),
-                    ),
+                    FilledButton(onPressed: _save, child: const Text('Save')),
                   ],
                 ),
               ],
@@ -1956,6 +2154,7 @@ class _ContactDialogState extends State<ContactDialog> {
         name: _nameController.text.trim(),
         number: _numberController.text.trim(),
         company: _companyController.text.trim(),
+        source: existing?.source ?? PhoneContactSource.manual,
       ),
     );
   }
@@ -1990,8 +2189,9 @@ class _AccountDialogState extends State<AccountDialog> {
     final account = widget.account;
 
     _nameController = TextEditingController(text: account?.name ?? '');
-    _displayNameController =
-        TextEditingController(text: account?.displayName ?? '');
+    _displayNameController = TextEditingController(
+      text: account?.displayName ?? '',
+    );
     _usernameController = TextEditingController(text: account?.username ?? '');
     _domainController = TextEditingController(text: account?.domain ?? '');
     _wssController = TextEditingController(text: account?.wssServer ?? '');
@@ -2038,8 +2238,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         ? 'Add WebRTC account'
                         : 'Edit WebRTC account',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   Wrap(
@@ -2050,8 +2250,9 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 348,
                         child: TextFormField(
                           controller: _nameController,
-                          decoration:
-                              const InputDecoration(labelText: 'Account name'),
+                          decoration: const InputDecoration(
+                            labelText: 'Account name',
+                          ),
                           validator: _required,
                         ),
                       ),
@@ -2059,16 +2260,18 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 348,
                         child: TextFormField(
                           controller: _displayNameController,
-                          decoration:
-                              const InputDecoration(labelText: 'Display name'),
+                          decoration: const InputDecoration(
+                            labelText: 'Display name',
+                          ),
                         ),
                       ),
                       DialogField(
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _usernameController,
-                          decoration:
-                              const InputDecoration(labelText: 'SIP user'),
+                          decoration: const InputDecoration(
+                            labelText: 'SIP user',
+                          ),
                           validator: _required,
                         ),
                       ),
@@ -2076,8 +2279,9 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _domainController,
-                          decoration:
-                              const InputDecoration(labelText: 'Domain'),
+                          decoration: const InputDecoration(
+                            labelText: 'Domain',
+                          ),
                           validator: _required,
                         ),
                       ),
@@ -2086,8 +2290,9 @@ class _AccountDialogState extends State<AccountDialog> {
                         child: TextFormField(
                           controller: _passwordController,
                           obscureText: true,
-                          decoration:
-                              const InputDecoration(labelText: 'Password'),
+                          decoration: const InputDecoration(
+                            labelText: 'Password',
+                          ),
                         ),
                       ),
                       DialogField(
@@ -2142,7 +2347,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         selected: _autoRegister,
                         label: const Text('Auto register'),
                         avatar: Icon(
-                            _autoRegister ? Icons.sync : Icons.sync_disabled),
+                          _autoRegister ? Icons.sync : Icons.sync_disabled,
+                        ),
                         onSelected: (value) {
                           setState(() {
                             _autoRegister = value;
@@ -2228,7 +2434,8 @@ class _AccountDialogState extends State<AccountDialog> {
       wssServer: _wssController.text.trim(),
       stunServer: _stunController.text.trim(),
       turnServer: _turnController.text.trim(),
-      hasPassword: _passwordController.text.isNotEmpty ||
+      hasPassword:
+          _passwordController.text.isNotEmpty ||
           (existing?.hasPassword ?? false),
       allowInsecureTransport: _allowInsecureTransport,
       enabled: _enabled,
@@ -2260,10 +2467,7 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: child,
-      ),
+      child: Padding(padding: const EdgeInsets.all(18), child: child),
     );
   }
 }
@@ -2289,12 +2493,12 @@ class PanelTitle extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
-        if (action != null) action!,
+        ?action,
       ],
     );
   }
@@ -2330,26 +2534,22 @@ class EmptyState extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            size: 34,
-            color: colorScheme.onSurfaceVariant,
-          ),
+          Icon(icon, size: 34, color: colorScheme.onSurfaceVariant),
           const SizedBox(height: 10),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(
             message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 14),
@@ -2376,8 +2576,9 @@ class StatusChip extends StatelessWidget {
       RegistrationStatus.registered => const Color(0xFF047857),
       RegistrationStatus.registering => const Color(0xFFB45309),
       RegistrationStatus.failed => const Color(0xFFB91C1C),
-      RegistrationStatus.offline =>
-        Theme.of(context).colorScheme.onSurfaceVariant,
+      RegistrationStatus.offline => Theme.of(
+        context,
+      ).colorScheme.onSurfaceVariant,
     };
 
     return Chip(
@@ -2408,16 +2609,16 @@ class InfoRow extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         ],
