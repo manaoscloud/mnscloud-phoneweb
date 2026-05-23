@@ -1,0 +1,10 @@
+# MNSCloud code ownership policy.
+
+* @manaoscloud/core-maintainers
+
+# Suggested future split:
+# /lib/src/account/ @manaoscloud/frontend-maintainers
+# /lib/src/voip/ @manaoscloud/voip-maintainers
+# /lib/src/call/ @manaoscloud/voip-maintainers
+# /docs/ @manaoscloud/docs-maintainers
+

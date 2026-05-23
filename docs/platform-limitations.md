@@ -1,0 +1,93 @@
+# Platform Limitations
+
+PhoneWeb is Flutter-based and targets Android, iOS, Web, Windows, macOS, and
+Linux. WebRTC behavior is not identical across platforms.
+
+## Android
+
+Expected MVP behavior:
+
+- registration while the app is foregrounded
+- outgoing calls
+- incoming calls while the app is running
+- microphone permission
+- speaker/mute where supported by platform plugins
+
+Important limitations:
+
+- app-closed incoming calls are not guaranteed without push infrastructure
+- background execution is affected by battery optimization
+- persistent WebSocket registration may be suspended by the OS
+- reliable production incoming calls usually require FCM plus native calling UI
+
+Future Android work:
+
+- Firebase Cloud Messaging
+- foreground service policy review
+- self-managed `ConnectionService`
+- battery optimization guidance
+- native audio route integration
+
+## iOS
+
+Expected MVP behavior:
+
+- foreground registration
+- outgoing calls
+- incoming calls while the app is active/running
+- microphone permission
+
+Important limitations:
+
+- iOS does not allow arbitrary indefinite background VoIP sockets for modern apps
+- closed-app incoming calls require APNs/PushKit and CallKit
+- PushKit requires a server capable of sending VoIP pushes
+- the initial backend-independent app cannot guarantee closed-app incoming calls
+
+Future iOS work:
+
+- APNs/PushKit adapter
+- CallKit adapter
+- optional push gateway integration
+- careful App Store policy compliance review
+
+## Web
+
+Expected MVP behavior:
+
+- SIP over WSS
+- WebRTC media
+- microphone permission through the browser
+
+Important limitations:
+
+- browser requires HTTPS for microphone/WebRTC in production
+- no traditional SIP UDP/TCP/TLS
+- background behavior depends on browser policies
+- audio device selection varies by browser
+- push and incoming call UX are browser-dependent
+
+## Windows, macOS, Linux
+
+Expected MVP behavior:
+
+- WebRTC registration and calls where `flutter_webrtc` supports the platform
+- desktop microphone permissions and audio route behavior by operating system
+
+Important limitations:
+
+- packaging differs per platform
+- audio device enumeration and switching can vary
+- auto-start/background behavior must be designed per OS
+- code signing/notarization may be required for distribution
+
+## Product Statement
+
+The MVP should clearly state:
+
+```text
+Incoming calls are supported while the app is running and registered.
+Reliable closed-app incoming calls require platform push integrations and a
+provider or gateway capable of sending push notifications.
+```
+

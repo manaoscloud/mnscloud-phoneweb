@@ -1,0 +1,21 @@
+.dart_tool/
+.packages
+.pub/
+build/
+coverage/
+pubspec.lock
+
+# Flutter generated platform folders will be committed after the first real app
+# scaffold is generated. Keep local IDE and build artifacts out.
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
