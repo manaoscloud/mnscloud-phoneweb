@@ -12,36 +12,44 @@ class PhoneWebApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF0F766E),
-      brightness: Brightness.light,
-    );
-
     return MaterialApp(
       title: 'MNSCloud PhoneWeb',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: colorScheme,
-        scaffoldBackgroundColor: const Color(0xFFF7F8F5),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          filled: true,
-          fillColor: Colors.white,
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: colorScheme.outlineVariant),
-          ),
-        ),
-      ),
+      theme: _phoneWebTheme(Brightness.light),
+      darkTheme: _phoneWebTheme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: const PhoneWebHomePage(),
     );
   }
+}
+
+ThemeData _phoneWebTheme(Brightness brightness) {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: const Color(0xFF0F766E),
+    brightness: brightness,
+  );
+  final dark = brightness == Brightness.dark;
+
+  return ThemeData(
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor:
+        dark ? const Color(0xFF151515) : const Color(0xFFF7F8F5),
+    useMaterial3: true,
+    inputDecorationTheme: InputDecorationTheme(
+      border: const OutlineInputBorder(),
+      filled: true,
+      fillColor: dark ? const Color(0xFF252525) : Colors.white,
+    ),
+    cardTheme: CardThemeData(
+      color: dark ? const Color(0xFF1F1F1F) : Colors.white,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: colorScheme.outlineVariant),
+      ),
+    ),
+  );
 }
 
 class PhoneWebHomePage extends StatefulWidget {
@@ -485,6 +493,9 @@ class MobilePhoneShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selectedColor = colorScheme.primary;
+    final unselectedColor = colorScheme.onSurfaceVariant;
     final pages = [
       MobileDialerView(
         dialNumber: dialNumber,
@@ -505,77 +516,63 @@ class MobilePhoneShell extends StatelessWidget {
       const MobileMessagesView(),
     ];
 
-    return Theme(
-      data: Theme.of(context).copyWith(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF151515),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFFA000),
-          secondary: Color(0xFF7AA43A),
-          surface: Color(0xFF1C1C1C),
-          surfaceContainerHighest: Color(0xFF252525),
-          onSurface: Colors.white,
-          onSurfaceVariant: Color(0xFFB8B8B8),
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            MobileTopBar(
+              account: selectedAccount,
+              accountCount: accounts.length,
+              onAccounts: () => _showAccountsSheet(context),
+            ),
+            Expanded(child: pages[currentIndex]),
+          ],
         ),
       ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF151515),
-        body: SafeArea(
-          child: Column(
-            children: [
-              MobileTopBar(
-                account: selectedAccount,
-                accountCount: accounts.length,
-                onAccounts: () => _showAccountsSheet(context),
-              ),
-              Expanded(child: pages[currentIndex]),
-            ],
+      bottomNavigationBar: NavigationBarTheme(
+        data: NavigationBarThemeData(
+          indicatorColor: Colors.transparent,
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: states.contains(WidgetState.selected)
+                  ? selectedColor
+                  : unselectedColor,
+            ),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              color: states.contains(WidgetState.selected)
+                  ? selectedColor
+                  : unselectedColor,
+            ),
           ),
         ),
-        bottomNavigationBar: NavigationBarTheme(
-          data: NavigationBarThemeData(
-            indicatorColor: Colors.transparent,
-            labelTextStyle: WidgetStateProperty.resolveWith(
-              (states) => TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: states.contains(WidgetState.selected)
-                    ? const Color(0xFFFFA000)
-                    : const Color(0xFF9E9E9E),
-              ),
+        child: NavigationBar(
+          height: 78,
+          backgroundColor: colorScheme.surfaceContainerHighest,
+          selectedIndex: currentIndex,
+          onDestinationSelected: onTabChanged,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.dialpad),
+              label: 'Telefone',
             ),
-            iconTheme: WidgetStateProperty.resolveWith(
-              (states) => IconThemeData(
-                color: states.contains(WidgetState.selected)
-                    ? const Color(0xFFFFA000)
-                    : const Color(0xFF9E9E9E),
-              ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              label: 'Contatos',
             ),
-          ),
-          child: NavigationBar(
-            height: 78,
-            backgroundColor: const Color(0xFF101010),
-            selectedIndex: currentIndex,
-            onDestinationSelected: onTabChanged,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.dialpad),
-                label: 'Telefone',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                label: 'Contatos',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.history),
-                label: 'Historico',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.chat_bubble_outline),
-                label: 'Mensagens',
-              ),
-            ],
-          ),
+            NavigationDestination(
+              icon: Icon(Icons.history),
+              label: 'Historico',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline),
+              label: 'Mensagens',
+            ),
+          ],
         ),
       ),
     );
@@ -584,7 +581,7 @@ class MobilePhoneShell extends StatelessWidget {
   void _showAccountsSheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF202020),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       showDragHandle: true,
       builder: (context) {
         return SafeArea(
@@ -679,13 +676,14 @@ class MobileTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentAccount = account;
     final registered = currentAccount?.status == RegistrationStatus.registered;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       height: 118,
       padding: const EdgeInsets.fromLTRB(22, 14, 22, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF181818),
-        border: Border(bottom: BorderSide(color: Color(0xFF333333))),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
       ),
       child: Column(
         children: [
@@ -745,7 +743,7 @@ class MobileTopBar extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: const Color(0xFFB8B8B8),
+                            color: colorScheme.onSurfaceVariant,
                           ),
                     ),
                   ],
@@ -788,6 +786,7 @@ class MobileDialerView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final canCall = selectedAccount != null &&
         voip.registrationStatus == RegistrationStatus.registered &&
         dialNumber.trim().isNotEmpty &&
@@ -802,21 +801,21 @@ class MobileDialerView extends StatelessWidget {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 180),
                 child: dialNumber.isEmpty
-                    ? const Column(
-                        key: ValueKey('brand'),
+                    ? Column(
+                        key: const ValueKey('brand'),
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.wifi_calling_3_outlined,
                             size: 104,
-                            color: Color(0xFFD0D0D0),
+                            color: colorScheme.onSurfaceVariant,
                           ),
-                          SizedBox(height: 18),
+                          const SizedBox(height: 18),
                           Text(
                             'MNSCloud',
                             style: TextStyle(
                               fontSize: 42,
-                              color: Color(0xFFD0D0D0),
+                              color: colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
@@ -838,7 +837,7 @@ class MobileDialerView extends StatelessWidget {
             ),
           ),
         ),
-        const Divider(height: 1, color: Color(0xFF8A8A8A)),
+        Divider(height: 1, color: colorScheme.outlineVariant),
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 22, 8, 8),
           child: MobileDialPad(onAppend: onAppend),
@@ -861,8 +860,9 @@ class MobileDialerView extends StatelessWidget {
                   onPressed: canCall ? onCall : null,
                   style: FilledButton.styleFrom(
                     shape: const CircleBorder(),
-                    backgroundColor: const Color(0xFF557D25),
-                    disabledBackgroundColor: const Color(0xFF2E3A25),
+                    backgroundColor: colorScheme.secondary,
+                    disabledBackgroundColor:
+                        colorScheme.surfaceContainerHighest,
                     padding: EdgeInsets.zero,
                   ),
                   child: const Icon(Icons.call, size: 34),
@@ -912,6 +912,7 @@ class MobileDialPad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -927,7 +928,7 @@ class MobileDialPad extends StatelessWidget {
         return TextButton(
           onPressed: () => onAppend(key.$1),
           style: TextButton.styleFrom(
-            foregroundColor: Colors.white,
+            foregroundColor: colorScheme.onSurface,
             shape: const RoundedRectangleBorder(),
           ),
           child: Column(
@@ -945,9 +946,9 @@ class MobileDialPad extends StatelessWidget {
                 height: 20,
                 child: Text(
                   key.$2,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFFB8B8B8),
+                    color: colorScheme.onSurfaceVariant,
                     letterSpacing: 0,
                   ),
                 ),
@@ -974,13 +975,14 @@ class MobileUtilityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return TextButton(
       onPressed: onPressed,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 34, color: Colors.white),
-          Text(label, style: const TextStyle(color: Color(0xFFB8B8B8))),
+          Icon(icon, size: 34, color: colorScheme.onSurface),
+          Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -1003,6 +1005,7 @@ class MobileContactsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
       child: Column(
@@ -1028,7 +1031,7 @@ class MobileContactsView extends StatelessWidget {
               hintText: 'Buscar contato',
               prefixIcon: const Icon(Icons.search),
               filled: true,
-              fillColor: const Color(0xFF252525),
+              fillColor: colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
@@ -1042,17 +1045,17 @@ class MobileContactsView extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.contacts_outlined,
                           size: 72,
-                          color: Color(0xFFB8B8B8),
+                          color: colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(height: 12),
                         const Text('Nenhum contato'),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Adicione contatos para discar mais rapido.',
-                          style: TextStyle(color: Color(0xFFB8B8B8)),
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 18),
                         FilledButton.icon(
@@ -1066,13 +1069,14 @@ class MobileContactsView extends StatelessWidget {
                 : ListView.separated(
                     itemCount: contacts.length,
                     separatorBuilder: (_, __) =>
-                        const Divider(color: Color(0xFF333333)),
+                        Divider(color: colorScheme.outlineVariant),
                     itemBuilder: (context, index) {
                       final contact = contacts[index];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF2D3A35),
+                          backgroundColor: colorScheme.primaryContainer,
+                          foregroundColor: colorScheme.onPrimaryContainer,
                           child: Text(
                               contact.name.isEmpty ? '?' : contact.name[0]),
                         ),
@@ -1144,13 +1148,14 @@ class MobileEmptyTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 76, color: const Color(0xFFB8B8B8)),
+            Icon(icon, size: 76, color: colorScheme.onSurfaceVariant),
             const SizedBox(height: 14),
             Text(
               title,
@@ -1162,7 +1167,7 @@ class MobileEmptyTab extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFFB8B8B8)),
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -1314,7 +1319,7 @@ class AccountTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? colorScheme.primaryContainer.withValues(alpha: 0.45)
-              : Colors.white,
+              : colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? colorScheme.primary : colorScheme.outlineVariant,
