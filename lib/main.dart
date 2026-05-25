@@ -709,88 +709,67 @@ class MobileTopBar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      height: 118,
-      padding: const EdgeInsets.fromLTRB(22, 14, 22, 12),
+      height: 82,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              Text(
-                _timeLabel(TimeOfDay.now()),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              IconButton(
+                onPressed: onAccounts,
+                icon: const Icon(Icons.menu, size: 32),
               ),
-              const SizedBox(width: 6),
-              const Icon(Icons.person, size: 20),
-              const Spacer(),
-              const Icon(Icons.signal_cellular_alt, size: 22),
-              const SizedBox(width: 10),
-              const Icon(Icons.wifi, size: 24),
-              const SizedBox(width: 10),
-              const Icon(Icons.battery_6_bar, size: 28),
+              if (accountCount == 0)
+                const Positioned(
+                  right: 7,
+                  top: 8,
+                  child: CircleAvatar(
+                    radius: 8,
+                    backgroundColor: Colors.red,
+                    child: Text('!', style: TextStyle(fontSize: 11)),
+                  ),
+                ),
             ],
           ),
-          const Spacer(),
-          Row(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    onPressed: onAccounts,
-                    icon: const Icon(Icons.menu, size: 32),
-                  ),
-                  if (accountCount == 0)
-                    const Positioned(
-                      right: 7,
-                      top: 8,
-                      child: CircleAvatar(
-                        radius: 8,
-                        backgroundColor: Colors.red,
-                        child: Text('!', style: TextStyle(fontSize: 11)),
-                      ),
-                    ),
-                ],
-              ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Text(
-                      registered ? 'Registrado' : 'Sem Servico',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    Text(
-                      currentAccount == null
-                          ? 'Vazio'
-                          : '${currentAccount.username}@${currentAccount.domain}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  registered ? 'Registrado' : 'Sem Servico',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ),
-              const SizedBox(width: 48),
-            ],
+                Text(
+                  currentAccount == null
+                      ? 'Vazio'
+                      : '${currentAccount.username}@${currentAccount.domain}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(
+            width: 48,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Icon(Icons.person_outline, size: 24),
+            ),
           ),
         ],
       ),
     );
-  }
-
-  static String _timeLabel(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 }
 
@@ -825,38 +804,68 @@ class MobileDialerView extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final tightHeight = constraints.maxHeight < 480;
-        final compactHeight = constraints.maxHeight < 560;
-        final dialKeyHeight = tightHeight
-            ? 56.0
-            : compactHeight
-            ? 68.0
-            : 86.0;
+        final availableHeight = constraints.maxHeight;
+        final tightHeight = availableHeight < 520;
+        final compactHeight = availableHeight < 640;
         final callButtonSize = tightHeight
-            ? 54.0
-            : compactHeight
-            ? 60.0
-            : 74.0;
-        final brandIconSize = tightHeight
             ? 48.0
             : compactHeight
-            ? 72.0
-            : 104.0;
-        final brandFontSize = tightHeight
-            ? 24.0
+            ? 56.0
+            : 66.0;
+        final brandIconSize = tightHeight
+            ? 34.0
             : compactHeight
-            ? 32.0
-            : 42.0;
+            ? 50.0
+            : 76.0;
+        final brandFontSize = tightHeight
+            ? 22.0
+            : compactHeight
+            ? 28.0
+            : 36.0;
         final numberFontSize = tightHeight
-            ? 30.0
+            ? 28.0
             : compactHeight
             ? 34.0
             : 42.0;
         final contentPadding = tightHeight
-            ? 6.0
+            ? 4.0
             : compactHeight
-            ? 12.0
-            : 24.0;
+            ? 8.0
+            : 16.0;
+        final preferredDialKeyHeight = tightHeight
+            ? 48.0
+            : compactHeight
+            ? 58.0
+            : 74.0;
+        final topAreaHeight = tightHeight
+            ? 76.0
+            : compactHeight
+            ? 112.0
+            : 154.0;
+        final controlsHeight =
+            callButtonSize +
+            (voip.hasActiveCall ? 78.0 : 0.0) +
+            (tightHeight
+                ? 14.0
+                : compactHeight
+                ? 18.0
+                : 26.0);
+        final dialPadChrome = tightHeight
+            ? 14.0
+            : compactHeight
+            ? 20.0
+            : 34.0;
+        final maxDialKeyHeight =
+            ((availableHeight -
+                        topAreaHeight -
+                        controlsHeight -
+                        dialPadChrome) /
+                    4)
+                .clamp(42.0, 78.0)
+                .toDouble();
+        final dialKeyHeight = preferredDialKeyHeight > maxDialKeyHeight
+            ? maxDialKeyHeight
+            : preferredDialKeyHeight;
 
         return Column(
           children: [
@@ -878,10 +887,10 @@ class MobileDialerView extends StatelessWidget {
                               ),
                               SizedBox(
                                 height: tightHeight
-                                    ? 6
+                                    ? 4
                                     : compactHeight
-                                    ? 8
-                                    : 18,
+                                    ? 6
+                                    : 12,
                               ),
                               Text(
                                 'MNSCloud',
@@ -914,12 +923,12 @@ class MobileDialerView extends StatelessWidget {
               padding: EdgeInsets.fromLTRB(
                 8,
                 tightHeight
-                    ? 4
+                    ? 2
                     : compactHeight
-                    ? 8
-                    : 22,
+                    ? 6
+                    : 16,
                 8,
-                4,
+                2,
               ),
               child: MobileDialPad(
                 keyHeight: dialKeyHeight,
@@ -932,10 +941,10 @@ class MobileDialerView extends StatelessWidget {
                 0,
                 26,
                 tightHeight
-                    ? 6
+                    ? 4
                     : compactHeight
-                    ? 8
-                    : 20,
+                    ? 6
+                    : 14,
               ),
               child: Row(
                 children: [
@@ -959,7 +968,7 @@ class MobileDialerView extends StatelessWidget {
                             colorScheme.surfaceContainerHighest,
                         padding: EdgeInsets.zero,
                       ),
-                      child: Icon(Icons.call, size: compactHeight ? 28 : 34),
+                      child: Icon(Icons.call, size: compactHeight ? 26 : 32),
                     ),
                   ),
                   Expanded(
@@ -969,7 +978,7 @@ class MobileDialerView extends StatelessWidget {
                         onPressed: dialNumber.isEmpty ? null : onBackspace,
                         icon: Icon(
                           Icons.backspace_outlined,
-                          size: compactHeight ? 28 : 34,
+                          size: compactHeight ? 26 : 32,
                         ),
                       ),
                     ),
@@ -979,7 +988,7 @@ class MobileDialerView extends StatelessWidget {
             ),
             if (voip.hasActiveCall)
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
                 child: ActiveCallControls(voip: voip),
               ),
           ],
@@ -1037,17 +1046,21 @@ class MobileDialPad extends StatelessWidget {
               Text(
                 key.$1,
                 style: TextStyle(
-                  fontSize: keyHeight < 76 ? 34 : 40,
+                  fontSize: keyHeight < 52
+                      ? 30
+                      : keyHeight < 68
+                      ? 34
+                      : 40,
                   fontWeight: FontWeight.w300,
                   height: 1,
                 ),
               ),
               SizedBox(
-                height: 20,
+                height: keyHeight < 52 ? 16 : 20,
                 child: Text(
                   key.$2,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: keyHeight < 52 ? 11 : 13,
                     color: colorScheme.onSurfaceVariant,
                     letterSpacing: 0,
                   ),
