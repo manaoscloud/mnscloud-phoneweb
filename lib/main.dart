@@ -962,7 +962,7 @@ class MobileDialerView extends StatelessWidget {
                     child: Center(
                       child: MobileUtilityButton(
                         icon: Icons.voicemail,
-                        label: 'VM',
+                        label: '',
                         compact: compactHeight,
                         onPressed: () => onAppend('*97'),
                       ),
