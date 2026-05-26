@@ -2251,25 +2251,25 @@ class _AccountDialogState extends State<AccountDialog> {
                       DialogField(
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'SIP Password',
+                          ),
+                        ),
+                      ),
+                      DialogField(
+                        width: compact ? double.infinity : 224,
+                        child: TextFormField(
                           controller: _domainController,
                           decoration: const InputDecoration(
-                            labelText: 'Domain',
+                            labelText: 'SIP Domain',
                           ),
                           validator: _required,
                         ),
                       ),
                       DialogField(
                         width: compact ? double.infinity : 224,
-                        child: TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                          ),
-                        ),
-                      ),
-                      DialogField(
-                        width: double.infinity,
                         child: TextFormField(
                           controller: _wssController,
                           decoration: const InputDecoration(
@@ -2280,7 +2280,7 @@ class _AccountDialogState extends State<AccountDialog> {
                         ),
                       ),
                       DialogField(
-                        width: compact ? double.infinity : 348,
+                        width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _stunController,
                           decoration: const InputDecoration(
@@ -2290,7 +2290,7 @@ class _AccountDialogState extends State<AccountDialog> {
                         ),
                       ),
                       DialogField(
-                        width: compact ? double.infinity : 348,
+                        width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _turnController,
                           decoration: const InputDecoration(
