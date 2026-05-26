@@ -1038,15 +1038,21 @@ class MobileDialPad extends StatelessWidget {
           onPressed: () => onAppend(key.$1),
           style: TextButton.styleFrom(
             foregroundColor: colorScheme.onSurface,
+            minimumSize: Size.zero,
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             shape: const RoundedRectangleBorder(),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 key.$1,
                 style: TextStyle(
-                  fontSize: keyHeight < 52
+                  fontSize: keyHeight < 46
+                      ? 26
+                      : keyHeight < 52
                       ? 30
                       : keyHeight < 68
                       ? 34
@@ -1056,11 +1062,19 @@ class MobileDialPad extends StatelessWidget {
                 ),
               ),
               SizedBox(
-                height: keyHeight < 52 ? 16 : 20,
+                height: keyHeight < 46
+                    ? 12
+                    : keyHeight < 52
+                    ? 16
+                    : 20,
                 child: Text(
                   key.$2,
                   style: TextStyle(
-                    fontSize: keyHeight < 52 ? 11 : 13,
+                    fontSize: keyHeight < 46
+                        ? 10
+                        : keyHeight < 52
+                        ? 11
+                        : 13,
                     color: colorScheme.onSurfaceVariant,
                     letterSpacing: 0,
                   ),
