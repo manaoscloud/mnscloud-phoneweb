@@ -1712,14 +1712,27 @@ class DialerPanel extends StatelessWidget {
                   const SizedBox(height: 14),
                   DialPad(onAppend: onAppend),
                   const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: FilledButton.icon(
-                      onPressed: canCall ? onCall : null,
-                      icon: const Icon(Icons.call),
-                      label: const Text('Call'),
-                    ),
+                  Row(
+                    children: [
+                      SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () => onAppend('*97'),
+                          child: const Icon(Icons.voicemail),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: FilledButton.icon(
+                            onPressed: canCall ? onCall : null,
+                            icon: const Icon(Icons.call),
+                            label: const Text('Call'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   if (voip.hasActiveCall) ...[
                     const SizedBox(height: 14),
