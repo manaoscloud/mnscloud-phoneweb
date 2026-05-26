@@ -959,11 +959,14 @@ class MobileDialerView extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: MobileUtilityButton(
-                      icon: Icons.voicemail,
-                      label: 'VM',
-                      compact: compactHeight,
-                      onPressed: () => onAppend('*97'),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: MobileUtilityButton(
+                        icon: Icons.voicemail,
+                        label: 'VM',
+                        compact: compactHeight,
+                        onPressed: () => onAppend('*97'),
+                      ),
                     ),
                   ),
                   SizedBox(
@@ -984,12 +987,11 @@ class MobileDialerView extends StatelessWidget {
                   Expanded(
                     child: Align(
                       alignment: Alignment.centerRight,
-                      child: IconButton(
+                      child: MobileUtilityButton(
+                        icon: Icons.backspace_outlined,
+                        label: '',
+                        compact: compactHeight,
                         onPressed: dialNumber.isEmpty ? null : onBackspace,
-                        icon: Icon(
-                          Icons.backspace_outlined,
-                          size: compactHeight ? 26 : 32,
-                        ),
                       ),
                     ),
                   ),
@@ -1109,19 +1111,42 @@ class MobileUtilityButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final enabled = onPressed != null;
     return TextButton(
       onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: colorScheme.onSurface,
+        disabledForegroundColor: colorScheme.onSurfaceVariant.withValues(
+          alpha: 0.52,
+        ),
+        minimumSize: Size(compact ? 64 : 78, compact ? 54 : 64),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: compact ? 28 : 34, color: colorScheme.onSurface),
-          Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant)),
+          Icon(
+            icon,
+            size: compact ? 28 : 34,
+            color: enabled
+                ? colorScheme.onSurface
+                : colorScheme.onSurfaceVariant.withValues(alpha: 0.52),
+          ),
+          Text(
+            label.isEmpty ? ' ' : label,
+            style: TextStyle(
+              color: enabled
+                  ? colorScheme.onSurfaceVariant
+                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.52),
+            ),
+          ),
         ],
       ),
     );
