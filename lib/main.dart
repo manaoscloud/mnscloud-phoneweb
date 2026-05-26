@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'src/account/webrtc_account.dart';
+import 'src/audio/keypad_tone_player.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
@@ -67,6 +68,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final List<PhoneContact> _contacts = [];
   final NativeContactsRepository _contactsRepository =
       NativeContactsRepository();
+  final KeypadTonePlayer _keypadTonePlayer = KeypadTonePlayer();
   late final PhoneWebVoipController _voip;
   String? _selectedAccountId;
   String _dialNumber = '';
@@ -86,6 +88,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   void dispose() {
     _voip.removeListener(_syncVoipState);
     _voip.dispose();
+    _keypadTonePlayer.dispose();
     super.dispose();
   }
 
@@ -164,6 +167,8 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   void _appendDial(String value) {
+    _keypadTonePlayer.play(value);
+
     if (_voip.hasActiveCall) {
       _voip.sendDtmf(value);
     }
@@ -660,6 +665,10 @@ class MobilePhoneShell extends StatelessWidget {
                         children: [
                           IconButton(
                             onPressed: () => onToggleRegistration(account),
+                            tooltip:
+                                account.status == RegistrationStatus.registered
+                                ? 'Disconnect account'
+                                : 'Register account',
                             icon: Icon(
                               account.status == RegistrationStatus.registered
                                   ? Icons.logout
@@ -671,6 +680,7 @@ class MobilePhoneShell extends StatelessWidget {
                               Navigator.pop(context);
                               onEditAccount(account);
                             },
+                            tooltip: 'Edit account',
                             icon: const Icon(Icons.edit_outlined),
                           ),
                         ],
