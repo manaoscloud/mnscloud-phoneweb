@@ -69,9 +69,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final NativeContactsRepository _contactsRepository =
       NativeContactsRepository();
   final KeypadTonePlayer _keypadTonePlayer = KeypadTonePlayer();
-  final TextEditingController _dialController = TextEditingController();
   late final PhoneWebVoipController _voip;
   String? _selectedAccountId;
+  String _dialNumber = '';
   String _lastEvent = 'Ready';
   int _mobileTabIndex = 0;
   bool _contactsSyncing = false;
@@ -82,13 +82,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     super.initState();
     _voip = PhoneWebVoipController();
     _voip.addListener(_syncVoipState);
-    _dialController.addListener(_syncDialNumberState);
   }
 
   @override
   void dispose() {
-    _dialController.removeListener(_syncDialNumberState);
-    _dialController.dispose();
     _voip.removeListener(_syncVoipState);
     _voip.dispose();
     _keypadTonePlayer.dispose();
@@ -169,14 +166,6 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
-  String get _dialNumber => _dialController.text;
-
-  void _syncDialNumberState() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
   void _appendDial(String value) {
     _keypadTonePlayer.play(value);
 
@@ -184,51 +173,25 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       _voip.sendDtmf(value);
     }
 
-    _replaceDialSelection(value);
+    setState(() {
+      _dialNumber = '$_dialNumber$value';
+    });
   }
 
   void _backspaceDial() {
-    final text = _dialController.text;
-    if (text.isEmpty) {
+    if (_dialNumber.isEmpty) {
       return;
     }
 
-    final selection = _dialController.selection;
-    if (selection.isValid && !selection.isCollapsed) {
-      _replaceDialRange(selection.start, selection.end, '');
-      return;
-    }
-
-    final cursor = selection.isValid ? selection.baseOffset : text.length;
-    if (cursor <= 0) {
-      return;
-    }
-
-    _replaceDialRange(cursor - 1, cursor, '');
+    setState(() {
+      _dialNumber = _dialNumber.substring(0, _dialNumber.length - 1);
+    });
   }
 
   void _clearDial() {
-    _dialController.clear();
-  }
-
-  void _replaceDialSelection(String value) {
-    final text = _dialController.text;
-    final selection = _dialController.selection;
-    final start = selection.isValid ? selection.start : text.length;
-    final end = selection.isValid ? selection.end : text.length;
-    _replaceDialRange(start, end, value);
-  }
-
-  void _replaceDialRange(int start, int end, String value) {
-    final text = _dialController.text;
-    final safeStart = start.clamp(0, text.length);
-    final safeEnd = end.clamp(safeStart, text.length);
-    final nextText = text.replaceRange(safeStart, safeEnd, value);
-    final nextOffset = safeStart + value.length;
-    _dialController.value = TextEditingValue(
-      text: nextText,
-      selection: TextSelection.collapsed(offset: nextOffset),
-    );
+    setState(() {
+      _dialNumber = '';
+    });
   }
 
   Future<void> _makeCall() async {
@@ -259,11 +222,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   void _dialContact(PhoneContact contact) {
-    _dialController.value = TextEditingValue(
-      text: contact.number,
-      selection: TextSelection.collapsed(offset: contact.number.length),
-    );
-    setState(() => _mobileTabIndex = 0);
+    setState(() {
+      _dialNumber = contact.number;
+      _mobileTabIndex = 0;
+    });
   }
 
   Future<void> _syncNativeContacts() async {
@@ -306,7 +268,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         accounts: _accounts,
         contacts: _contacts,
         selectedAccount: _selectedAccount,
-        dialController: _dialController,
+        dialNumber: _dialNumber,
         voip: _voip,
         currentIndex: _mobileTabIndex,
         lastEvent: _lastEvent,
@@ -389,7 +351,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                           Expanded(
                             child: WorkspacePanels(
                               selectedAccount: _selectedAccount,
-                              dialController: _dialController,
+                              dialNumber: _dialNumber,
                               voip: _voip,
                               onAppend: _appendDial,
                               onBackspace: _backspaceDial,
@@ -434,7 +396,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       const SizedBox(height: 16),
       DialerPanel(
         selectedAccount: _selectedAccount,
-        dialController: _dialController,
+        dialNumber: _dialNumber,
         voip: _voip,
         onAppend: _appendDial,
         onBackspace: _backspaceDial,
@@ -450,7 +412,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 class WorkspacePanels extends StatelessWidget {
   const WorkspacePanels({
     required this.selectedAccount,
-    required this.dialController,
+    required this.dialNumber,
     required this.voip,
     required this.onAppend,
     required this.onBackspace,
@@ -460,7 +422,7 @@ class WorkspacePanels extends StatelessWidget {
   });
 
   final WebRtcAccount? selectedAccount;
-  final TextEditingController dialController;
+  final String dialNumber;
   final PhoneWebVoipController voip;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
@@ -478,7 +440,7 @@ class WorkspacePanels extends StatelessWidget {
               Expanded(
                 child: DialerPanel(
                   selectedAccount: selectedAccount,
-                  dialController: dialController,
+                  dialNumber: dialNumber,
                   voip: voip,
                   onAppend: onAppend,
                   onBackspace: onBackspace,
@@ -496,7 +458,7 @@ class WorkspacePanels extends StatelessWidget {
           children: [
             DialerPanel(
               selectedAccount: selectedAccount,
-              dialController: dialController,
+              dialNumber: dialNumber,
               voip: voip,
               onAppend: onAppend,
               onBackspace: onBackspace,
@@ -517,7 +479,7 @@ class MobilePhoneShell extends StatelessWidget {
     required this.accounts,
     required this.contacts,
     required this.selectedAccount,
-    required this.dialController,
+    required this.dialNumber,
     required this.voip,
     required this.currentIndex,
     required this.lastEvent,
@@ -543,7 +505,7 @@ class MobilePhoneShell extends StatelessWidget {
   final List<WebRtcAccount> accounts;
   final List<PhoneContact> contacts;
   final WebRtcAccount? selectedAccount;
-  final TextEditingController dialController;
+  final String dialNumber;
   final PhoneWebVoipController voip;
   final int currentIndex;
   final String lastEvent;
@@ -571,7 +533,7 @@ class MobilePhoneShell extends StatelessWidget {
     final unselectedColor = colorScheme.onSurfaceVariant;
     final pages = [
       MobileDialerView(
-        dialController: dialController,
+        dialNumber: dialNumber,
         voip: voip,
         selectedAccount: selectedAccount,
         onAppend: onAppend,
@@ -823,7 +785,7 @@ class MobileTopBar extends StatelessWidget {
 
 class MobileDialerView extends StatelessWidget {
   const MobileDialerView({
-    required this.dialController,
+    required this.dialNumber,
     required this.voip,
     required this.selectedAccount,
     required this.onAppend,
@@ -833,7 +795,7 @@ class MobileDialerView extends StatelessWidget {
     super.key,
   });
 
-  final TextEditingController dialController;
+  final String dialNumber;
   final PhoneWebVoipController voip;
   final WebRtcAccount? selectedAccount;
   final ValueChanged<String> onAppend;
@@ -844,7 +806,6 @@ class MobileDialerView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final dialNumber = dialController.text;
     final canCall =
         selectedAccount != null &&
         voip.registrationStatus == RegistrationStatus.registered &&
@@ -951,27 +912,16 @@ class MobileDialerView extends StatelessWidget {
                               ),
                             ],
                           )
-                        : ConstrainedBox(
+                        : Text(
                             key: const ValueKey('number'),
-                            constraints: const BoxConstraints(maxWidth: 320),
-                            child: TextField(
-                              controller: dialController,
-                              keyboardType: TextInputType.phone,
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontSize: numberFontSize,
-                                fontWeight: FontWeight.w300,
-                                letterSpacing: 0,
-                              ),
-                              decoration: const InputDecoration(
-                                isCollapsed: true,
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                              ),
+                            dialNumber,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: numberFontSize,
+                              fontWeight: FontWeight.w300,
+                              letterSpacing: 0,
                             ),
                           ),
                   ),
@@ -1648,7 +1598,7 @@ class AccountTile extends StatelessWidget {
 class DialerPanel extends StatelessWidget {
   const DialerPanel({
     required this.selectedAccount,
-    required this.dialController,
+    required this.dialNumber,
     required this.voip,
     required this.onAppend,
     required this.onBackspace,
@@ -1658,7 +1608,7 @@ class DialerPanel extends StatelessWidget {
   });
 
   final WebRtcAccount? selectedAccount;
-  final TextEditingController dialController;
+  final String dialNumber;
   final PhoneWebVoipController voip;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
@@ -1670,7 +1620,7 @@ class DialerPanel extends StatelessWidget {
     final canCall =
         selectedAccount != null &&
         voip.registrationStatus == RegistrationStatus.registered &&
-        dialController.text.trim().isNotEmpty &&
+        dialNumber.trim().isNotEmpty &&
         !voip.hasActiveCall;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -1702,38 +1652,27 @@ class DialerPanel extends StatelessWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: TextField(
-                              controller: dialController,
-                              keyboardType: TextInputType.phone,
+                            child: Text(
+                              dialNumber.isEmpty ? 'Enter number' : dialNumber,
                               maxLines: 1,
-                              textInputAction: TextInputAction.done,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
-                                    color: colorScheme.onSurface,
+                                    color: dialNumber.isEmpty
+                                        ? colorScheme.onSurfaceVariant
+                                        : colorScheme.onSurface,
                                     fontWeight: FontWeight.w700,
                                   ),
-                              decoration: InputDecoration(
-                                hintText: 'Enter number',
-                                hintStyle: TextStyle(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                isCollapsed: true,
-                                border: InputBorder.none,
-                              ),
                             ),
                           ),
                           IconButton(
                             tooltip: 'Backspace',
-                            onPressed: dialController.text.isEmpty
-                                ? null
-                                : onBackspace,
+                            onPressed: dialNumber.isEmpty ? null : onBackspace,
                             icon: const Icon(Icons.backspace_outlined),
                           ),
                           IconButton(
                             tooltip: 'Clear',
-                            onPressed: dialController.text.isEmpty
-                                ? null
-                                : onClear,
+                            onPressed: dialNumber.isEmpty ? null : onClear,
                             icon: const Icon(Icons.close),
                           ),
                         ],
