@@ -947,9 +947,9 @@ class MobileDialerView extends StatelessWidget {
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(
-                26,
+                8,
                 0,
-                26,
+                8,
                 tightHeight
                     ? 4
                     : compactHeight
@@ -959,8 +959,7 @@ class MobileDialerView extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
+                    child: Center(
                       child: MobileUtilityButton(
                         icon: Icons.voicemail,
                         label: 'VM',
@@ -969,24 +968,30 @@ class MobileDialerView extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: callButtonSize,
-                    height: callButtonSize,
-                    child: FilledButton(
-                      onPressed: canCall ? onCall : null,
-                      style: FilledButton.styleFrom(
-                        shape: const CircleBorder(),
-                        backgroundColor: colorScheme.secondary,
-                        disabledBackgroundColor:
-                            colorScheme.surfaceContainerHighest,
-                        padding: EdgeInsets.zero,
+                  Expanded(
+                    child: Center(
+                      child: SizedBox(
+                        width: callButtonSize,
+                        height: callButtonSize,
+                        child: FilledButton(
+                          onPressed: canCall ? onCall : null,
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            backgroundColor: colorScheme.secondary,
+                            disabledBackgroundColor:
+                                colorScheme.surfaceContainerHighest,
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Icon(
+                            Icons.call,
+                            size: compactHeight ? 26 : 32,
+                          ),
+                        ),
                       ),
-                      child: Icon(Icons.call, size: compactHeight ? 26 : 32),
                     ),
                   ),
                   Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
+                    child: Center(
                       child: MobileUtilityButton(
                         icon: Icons.backspace_outlined,
                         label: '',
