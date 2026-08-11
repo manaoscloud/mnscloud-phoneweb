@@ -41,6 +41,32 @@ void main() {
       expect(diagnostic.copyText, contains('Retrying: yes'));
     });
 
+    test('classifies temporary auth backend failures as retryable warnings', () {
+      final diagnostic = RegistrationDiagnostic.fromSipFailure(
+        statusCode: 503,
+        cause: 'SIP_FAILURE_CODE',
+        reasonPhrase: 'Authentication Temporarily Unavailable',
+      );
+
+      expect(diagnostic.code, 'sip_auth_temporarily_unavailable');
+      expect(diagnostic.retrying, isTrue);
+      expect(diagnostic.severity, RegistrationDiagnosticSeverity.warning);
+      expect(diagnostic.summary, '503 · Authentication temporarily unavailable');
+    });
+
+    test('classifies registration storage failures as retryable warnings', () {
+      final diagnostic = RegistrationDiagnostic.fromSipFailure(
+        statusCode: 503,
+        cause: 'SIP_FAILURE_CODE',
+        reasonPhrase: 'Registration Storage Unavailable',
+      );
+
+      expect(diagnostic.code, 'sip_registration_storage_unavailable');
+      expect(diagnostic.retrying, isTrue);
+      expect(diagnostic.severity, RegistrationDiagnosticSeverity.warning);
+      expect(diagnostic.summary, '503 · Registration storage unavailable');
+    });
+
     test('classifies unexpected unregisters as retryable interruptions', () {
       final diagnostic = RegistrationDiagnostic.interrupted(
         cause: 'CONNECTION_ERROR',

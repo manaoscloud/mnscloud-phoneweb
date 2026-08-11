@@ -163,6 +163,7 @@ class RegistrationDiagnostic {
     String? cause,
     String? reasonPhrase,
   ) {
+    final reason = reasonPhrase?.toLowerCase() ?? '';
     return switch (statusCode) {
       401 || 407 => const _DiagnosticMap(
         code: 'sip_auth_challenge_failed',
@@ -209,6 +210,24 @@ class RegistrationDiagnostic {
         severity: RegistrationDiagnosticSeverity.warning,
         retrying: true,
       ),
+      503 when reason.contains('authentication temporarily unavailable') =>
+        const _DiagnosticMap(
+          code: 'sip_auth_temporarily_unavailable',
+          title: 'Authentication temporarily unavailable',
+          detail:
+              'The SIP server could not validate the account with the realtime authentication service right now. PhoneWeb will retry automatically; check the softswitch/API runtime path if this persists.',
+          severity: RegistrationDiagnosticSeverity.warning,
+          retrying: true,
+        ),
+      503 when reason.contains('registration storage unavailable') =>
+        const _DiagnosticMap(
+          code: 'sip_registration_storage_unavailable',
+          title: 'Registration storage unavailable',
+          detail:
+              'The SIP server authenticated the account but could not save the registration contact. PhoneWeb will retry automatically; check the softswitch location storage/runtime logs.',
+          severity: RegistrationDiagnosticSeverity.warning,
+          retrying: true,
+        ),
       500 || 502 || 503 || 504 => const _DiagnosticMap(
         code: 'sip_server_error',
         title: 'SIP server error',
