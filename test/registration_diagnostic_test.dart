@@ -40,5 +40,16 @@ void main() {
       expect(diagnostic.copyText, isNot(contains('\nUnavailable')));
       expect(diagnostic.copyText, contains('Retrying: yes'));
     });
+
+    test('classifies unexpected unregisters as retryable interruptions', () {
+      final diagnostic = RegistrationDiagnostic.interrupted(
+        cause: 'CONNECTION_ERROR',
+      );
+
+      expect(diagnostic.code, 'registration_interrupted');
+      expect(diagnostic.retrying, isTrue);
+      expect(diagnostic.severity, RegistrationDiagnosticSeverity.warning);
+      expect(diagnostic.summary, 'Registration interrupted');
+    });
   });
 }

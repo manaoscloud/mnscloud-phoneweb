@@ -203,12 +203,19 @@ class PhoneWebVoipController extends ChangeNotifier
     _transportState = state.state;
     if (state.state == TransportStateEnum.DISCONNECTED &&
         !_manualStopRequested) {
+      if (_registrationStatus == RegistrationStatus.registered ||
+          _registrationStatus == RegistrationStatus.registering) {
+        _registrationStatus = RegistrationStatus.registering;
+      }
       _registrationDiagnostic = RegistrationDiagnostic.fromTransport(
         transportState: state.state.name.toLowerCase(),
         statusCode: state.cause?.status_code,
         cause: state.cause?.cause,
         reasonPhrase: state.cause?.reason_phrase,
       );
+      _setEvent(_registrationDiagnostic!.summary);
+      notifyListeners();
+      return;
     }
     _setEvent('Transport ${state.state.name.toLowerCase()}');
     notifyListeners();
@@ -228,12 +235,24 @@ class PhoneWebVoipController extends ChangeNotifier
       return;
     }
 
-    _registrationStatus = switch (state.state) {
+    final nextStatus = switch (state.state) {
       RegistrationStateEnum.REGISTERED => RegistrationStatus.registered,
       RegistrationStateEnum.REGISTRATION_FAILED => RegistrationStatus.failed,
       RegistrationStateEnum.UNREGISTERED => RegistrationStatus.offline,
       RegistrationStateEnum.NONE || null => RegistrationStatus.offline,
     };
+
+    final unexpectedUnregistered =
+        !_manualStopRequested &&
+        nextStatus == RegistrationStatus.offline &&
+        (_started ||
+            _registrationStatus == RegistrationStatus.registered ||
+            _registrationStatus == RegistrationStatus.registering);
+
+    _registrationStatus = unexpectedUnregistered
+        ? RegistrationStatus.registering
+        : nextStatus;
+
     if (_registrationStatus == RegistrationStatus.offline ||
         _registrationStatus == RegistrationStatus.failed) {
       _started = false;
@@ -241,6 +260,12 @@ class PhoneWebVoipController extends ChangeNotifier
     if (_registrationStatus == RegistrationStatus.registered) {
       _manualStopRequested = false;
       _registrationDiagnostic = RegistrationDiagnostic.registered();
+    } else if (unexpectedUnregistered) {
+      _registrationDiagnostic = RegistrationDiagnostic.interrupted(
+        statusCode: state.cause?.status_code,
+        cause: state.cause?.cause,
+        reasonPhrase: state.cause?.reason_phrase,
+      );
     } else if (_registrationStatus == RegistrationStatus.registering) {
       _registrationDiagnostic = RegistrationDiagnostic.registering();
     } else if (_registrationStatus == RegistrationStatus.failed) {
@@ -253,7 +278,8 @@ class PhoneWebVoipController extends ChangeNotifier
       _registrationDiagnostic = RegistrationDiagnostic.stopped();
     }
     _setEvent(
-      _registrationStatus == RegistrationStatus.failed &&
+      (_registrationStatus == RegistrationStatus.failed ||
+                  unexpectedUnregistered) &&
               _registrationDiagnostic != null
           ? _registrationDiagnostic!.summary
           : 'Registration ${_registrationStatus.label.toLowerCase()}',

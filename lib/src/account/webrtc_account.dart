@@ -90,6 +90,25 @@ class RegistrationDiagnostic {
     );
   }
 
+  static RegistrationDiagnostic interrupted({
+    int? statusCode,
+    String? cause,
+    String? reasonPhrase,
+  }) {
+    final normalized = _normalize(cause);
+    return RegistrationDiagnostic(
+      code: 'registration_interrupted',
+      title: 'Registration interrupted',
+      detail:
+          'The SIP registration was interrupted unexpectedly. PhoneWeb is waiting for the WebSocket/SIP stack to reconnect or refresh the registration.',
+      severity: RegistrationDiagnosticSeverity.warning,
+      observedAt: DateTime.now(),
+      statusCode: statusCode,
+      reasonPhrase: _cleanText(reasonPhrase ?? normalized),
+      retrying: true,
+    );
+  }
+
   static RegistrationDiagnostic fromTransport({
     required String transportState,
     int? statusCode,

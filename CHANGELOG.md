@@ -7,6 +7,8 @@ initial planning and scaffolding phase.
 
 ## Unreleased
 
+- Changed unexpected SIP unregistration events to show a retrying
+  registration interruption instead of a manual stopped/offline state.
 - Added safe SIP registration diagnostics with user-facing failure reasons,
   retry hints, and sanitized copy output.
 - Added registration diagnostic details to desktop and mobile account views.
