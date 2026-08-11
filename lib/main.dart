@@ -1864,26 +1864,28 @@ class ActiveCallControls extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (voip.hasIncomingCall)
+              if (voip.hasIncomingCall) ...[
                 FilledButton.icon(
                   onPressed: voip.answer,
                   icon: const Icon(Icons.call),
                   label: const Text('Answer'),
                 ),
-              FilledButton.tonalIcon(
-                onPressed: voip.toggleMute,
-                icon: Icon(voip.muted ? Icons.mic_off : Icons.mic),
-                label: Text(voip.muted ? 'Unmute' : 'Mute'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: voip.toggleHold,
-                icon: Icon(voip.onHold ? Icons.play_arrow : Icons.pause),
-                label: Text(voip.onHold ? 'Resume' : 'Hold'),
-              ),
+              ] else ...[
+                FilledButton.tonalIcon(
+                  onPressed: voip.toggleMute,
+                  icon: Icon(voip.muted ? Icons.mic_off : Icons.mic),
+                  label: Text(voip.muted ? 'Unmute' : 'Mute'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: voip.toggleHold,
+                  icon: Icon(voip.onHold ? Icons.play_arrow : Icons.pause),
+                  label: Text(voip.onHold ? 'Resume' : 'Hold'),
+                ),
+              ],
               FilledButton.icon(
                 onPressed: voip.rejectOrHangup,
                 icon: const Icon(Icons.call_end),
-                label: const Text('Hang up'),
+                label: Text(voip.hasIncomingCall ? 'Decline' : 'Hang up'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFB91C1C),
                 ),

@@ -32,11 +32,22 @@ class PhoneWebVoipController extends ChangeNotifier
   bool get onHold => _onHold;
   bool get isRegistered => _helper.registered;
   bool get hasActiveCall => _activeCall != null;
+  bool get hasEstablishedCall =>
+      _activeCall != null &&
+      (_callState == CallStateEnum.ACCEPTED ||
+          _callState == CallStateEnum.CONFIRMED ||
+          _callState == CallStateEnum.STREAM ||
+          _callState == CallStateEnum.MUTED ||
+          _callState == CallStateEnum.UNMUTED ||
+          _callState == CallStateEnum.HOLD ||
+          _callState == CallStateEnum.UNHOLD);
   bool get hasIncomingCall =>
       _activeCall != null &&
       _activeCall!.direction == Direction.incoming &&
-      (_callState == CallStateEnum.CALL_INITIATION ||
-          _callState == CallStateEnum.CONNECTING);
+      !hasEstablishedCall &&
+      _callState != CallStateEnum.FAILED &&
+      _callState != CallStateEnum.ENDED &&
+      _callState != CallStateEnum.NONE;
   String get remoteIdentity => _activeCall?.remote_identity ?? '';
 
   Future<void> register(WebRtcAccount account) async {
@@ -222,24 +233,29 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void callStateChanged(Call call, CallState state) {
-    _activeCall = call;
     _callState = state.state;
 
     switch (state.state) {
-      case CallStateEnum.MUTED:
-        _muted = true;
-      case CallStateEnum.UNMUTED:
-        _muted = false;
-      case CallStateEnum.HOLD:
-        _onHold = true;
-      case CallStateEnum.UNHOLD:
-        _onHold = false;
+      case CallStateEnum.NONE:
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
         _activeCall = null;
         _muted = false;
         _onHold = false;
+      case CallStateEnum.MUTED:
+        _activeCall = call;
+        _muted = true;
+      case CallStateEnum.UNMUTED:
+        _activeCall = call;
+        _muted = false;
+      case CallStateEnum.HOLD:
+        _activeCall = call;
+        _onHold = true;
+      case CallStateEnum.UNHOLD:
+        _activeCall = call;
+        _onHold = false;
       default:
+        _activeCall = call;
         break;
     }
 
