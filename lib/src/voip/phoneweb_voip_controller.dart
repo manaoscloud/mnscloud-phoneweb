@@ -47,7 +47,7 @@ class PhoneWebVoipController extends ChangeNotifier
       return;
     }
 
-    final webSocketUrl = normalizeSipWebSocketUrl(account.wssServer);
+    final webSocketUrl = account.wssServer.trim();
     final uri = Uri.tryParse(webSocketUrl);
     if (uri == null || (uri.scheme != 'wss' && uri.scheme != 'ws')) {
       _setEvent('WebSocket URL is invalid for ${account.name}');
@@ -91,18 +91,6 @@ class PhoneWebVoipController extends ChangeNotifier
 
     _started = true;
     await _helper.start(settings);
-  }
-
-  static String normalizeSipWebSocketUrl(String value) {
-    final trimmed = value.trim();
-    final uri = Uri.tryParse(trimmed);
-    if (uri == null || !uri.hasScheme || uri.path.isNotEmpty) {
-      return trimmed;
-    }
-    if (uri.scheme != 'wss' && uri.scheme != 'ws') {
-      return trimmed;
-    }
-    return uri.replace(path: '/ws').toString();
   }
 
   Future<void> unregister() async {

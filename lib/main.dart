@@ -2404,9 +2404,7 @@ class _AccountDialogState extends State<AccountDialog> {
       username: _usernameController.text.trim(),
       password: _passwordController.text,
       domain: _domainController.text.trim(),
-      wssServer: PhoneWebVoipController.normalizeSipWebSocketUrl(
-        _wssController.text,
-      ),
+      wssServer: _wssController.text.trim(),
       stunServer: _stunController.text.trim(),
       turnServer: _turnController.text.trim(),
       hasPassword:
