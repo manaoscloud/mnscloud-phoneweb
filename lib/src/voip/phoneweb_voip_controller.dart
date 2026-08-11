@@ -21,6 +21,7 @@ class PhoneWebVoipController extends ChangeNotifier
   bool _muted = false;
   bool _onHold = false;
   bool _started = false;
+  bool _manualStopRequested = false;
 
   WebRtcAccount? get account => _account;
   RegistrationStatus get registrationStatus => _registrationStatus;
@@ -63,6 +64,7 @@ class PhoneWebVoipController extends ChangeNotifier
     }
 
     _account = account;
+    _manualStopRequested = false;
     _registrationStatus = RegistrationStatus.registering;
     _setEvent('Registering ${account.name}');
     notifyListeners();
@@ -94,6 +96,7 @@ class PhoneWebVoipController extends ChangeNotifier
   }
 
   Future<void> unregister() async {
+    _manualStopRequested = true;
     if (_helper.registered) {
       await _helper.unregister(true);
     } else {
@@ -189,6 +192,17 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void registrationStateChanged(RegistrationState state) {
+    if (!_manualStopRequested &&
+        _helper.registered &&
+        (state.state == RegistrationStateEnum.REGISTRATION_FAILED ||
+            state.state == RegistrationStateEnum.UNREGISTERED)) {
+      _registrationStatus = RegistrationStatus.registered;
+      _started = true;
+      _setEvent('Registration registered');
+      notifyListeners();
+      return;
+    }
+
     _registrationStatus = switch (state.state) {
       RegistrationStateEnum.REGISTERED => RegistrationStatus.registered,
       RegistrationStateEnum.REGISTRATION_FAILED => RegistrationStatus.failed,
@@ -198,6 +212,9 @@ class PhoneWebVoipController extends ChangeNotifier
     if (_registrationStatus == RegistrationStatus.offline ||
         _registrationStatus == RegistrationStatus.failed) {
       _started = false;
+    }
+    if (_registrationStatus == RegistrationStatus.registered) {
+      _manualStopRequested = false;
     }
     _setEvent('Registration ${_registrationStatus.label.toLowerCase()}');
     notifyListeners();
