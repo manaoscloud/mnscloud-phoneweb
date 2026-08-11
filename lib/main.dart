@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
@@ -159,6 +160,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           _accounts[index] = _accounts[index].copyWith(
             status: _voip.registrationStatus,
             enabled: _voip.registrationStatus == RegistrationStatus.registered,
+            diagnostic: _voip.registrationDiagnostic,
           );
         }
       }
@@ -655,7 +657,12 @@ class MobilePhoneShell extends StatelessWidget {
                     (account) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(account.name),
-                      subtitle: Text('${account.username}@${account.domain}'),
+                      subtitle: Text(
+                        account.diagnostic == null
+                            ? '${account.username}@${account.domain}'
+                            : '${account.username}@${account.domain}\n${account.diagnostic!.summary}',
+                      ),
+                      isThreeLine: account.diagnostic != null,
                       leading: Icon(
                         selectedAccount?.id == account.id
                             ? Icons.radio_button_checked
@@ -675,6 +682,16 @@ class MobilePhoneShell extends StatelessWidget {
                                   : Icons.login,
                             ),
                           ),
+                          if (account.diagnostic != null)
+                            IconButton(
+                              onPressed: () =>
+                                  _showRegistrationDiagnosticDialog(
+                                    context,
+                                    account,
+                                  ),
+                              tooltip: 'Registration details',
+                              icon: const Icon(Icons.info_outline),
+                            ),
                           IconButton(
                             onPressed: () {
                               Navigator.pop(context);
@@ -1588,6 +1605,14 @@ class AccountTile extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (account.diagnostic != null) ...[
+                const SizedBox(height: 10),
+                RegistrationDiagnosticBanner(
+                  diagnostic: account.diagnostic!,
+                  onDetails: () =>
+                      _showRegistrationDiagnosticDialog(context, account),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -1610,6 +1635,13 @@ class AccountTile extends StatelessWidget {
                     onPressed: onEdit,
                     icon: const Icon(Icons.edit_outlined),
                   ),
+                  if (account.diagnostic != null)
+                    IconButton(
+                      tooltip: 'Registration details',
+                      onPressed: () =>
+                          _showRegistrationDiagnosticDialog(context, account),
+                      icon: const Icon(Icons.info_outline),
+                    ),
                   IconButton(
                     tooltip: 'Remove account',
                     onPressed: onRemove,
@@ -1623,6 +1655,132 @@ class AccountTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class RegistrationDiagnosticBanner extends StatelessWidget {
+  const RegistrationDiagnosticBanner({
+    required this.diagnostic,
+    required this.onDetails,
+    super.key,
+  });
+
+  final RegistrationDiagnostic diagnostic;
+  final VoidCallback onDetails;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (diagnostic.severity) {
+      RegistrationDiagnosticSeverity.info => Theme.of(
+        context,
+      ).colorScheme.primary,
+      RegistrationDiagnosticSeverity.warning => const Color(0xFFB45309),
+      RegistrationDiagnosticSeverity.error => const Color(0xFFB91C1C),
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              diagnostic.retrying
+                  ? Icons.sync_problem_outlined
+                  : Icons.info_outline,
+              size: 18,
+              color: color,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                diagnostic.retrying
+                    ? '${diagnostic.summary} · retrying'
+                    : diagnostic.summary,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            TextButton(onPressed: onDetails, child: const Text('Details')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showRegistrationDiagnosticDialog(
+  BuildContext context,
+  WebRtcAccount account,
+) async {
+  final diagnostic = account.diagnostic;
+  if (diagnostic == null) return;
+
+  await showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Registration diagnostic'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InfoRow(label: 'Account', value: account.name),
+              InfoRow(label: 'SIP user', value: account.username),
+              InfoRow(label: 'Domain', value: account.domain),
+              InfoRow(label: 'WSS', value: account.wssServer),
+              InfoRow(label: 'Status', value: account.status.label),
+              InfoRow(label: 'Diagnostic', value: diagnostic.summary),
+              InfoRow(label: 'Code', value: diagnostic.code),
+              if (diagnostic.reasonPhrase != null)
+                InfoRow(label: 'Reason', value: diagnostic.reasonPhrase!),
+              InfoRow(
+                label: 'Retrying',
+                value: diagnostic.retrying ? 'Yes' : 'No',
+              ),
+              InfoRow(
+                label: 'Observed',
+                value: diagnostic.observedAt.toLocal().toString(),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                diagnostic.detail,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: diagnostic.copyText));
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Diagnostic copied')),
+              );
+            }
+          },
+          icon: const Icon(Icons.copy_outlined),
+          label: const Text('Copy'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
 }
 
 class DialerPanel extends StatelessWidget {
@@ -2416,6 +2574,7 @@ class _AccountDialogState extends State<AccountDialog> {
       enabled: _enabled,
       autoRegister: _autoRegister,
       status: existing?.status ?? RegistrationStatus.offline,
+      diagnostic: existing?.diagnostic,
     );
 
     Navigator.of(context).pop(account);

@@ -7,6 +7,9 @@ initial planning and scaffolding phase.
 
 ## Unreleased
 
+- Added safe SIP registration diagnostics with user-facing failure reasons,
+  retry hints, and sanitized copy output.
+- Added registration diagnostic details to desktop and mobile account views.
 - Fixed incoming WebRTC calls staying in progress without answer/decline
   controls.
 - Fixed active call controls so incoming ringing calls show Answer/Decline

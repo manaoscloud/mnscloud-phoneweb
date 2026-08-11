@@ -15,6 +15,7 @@ class PhoneWebVoipController extends ChangeNotifier
   WebRtcAccount? _account;
   Call? _activeCall;
   RegistrationStatus _registrationStatus = RegistrationStatus.offline;
+  RegistrationDiagnostic? _registrationDiagnostic;
   TransportStateEnum _transportState = TransportStateEnum.NONE;
   CallStateEnum _callState = CallStateEnum.NONE;
   String _lastEvent = 'Ready';
@@ -25,6 +26,7 @@ class PhoneWebVoipController extends ChangeNotifier
 
   WebRtcAccount? get account => _account;
   RegistrationStatus get registrationStatus => _registrationStatus;
+  RegistrationDiagnostic? get registrationDiagnostic => _registrationDiagnostic;
   TransportStateEnum get transportState => _transportState;
   CallStateEnum get callState => _callState;
   String get lastEvent => _lastEvent;
@@ -77,6 +79,7 @@ class PhoneWebVoipController extends ChangeNotifier
     _account = account;
     _manualStopRequested = false;
     _registrationStatus = RegistrationStatus.registering;
+    _registrationDiagnostic = RegistrationDiagnostic.registering();
     _setEvent('Registering ${account.name}');
     notifyListeners();
 
@@ -116,6 +119,7 @@ class PhoneWebVoipController extends ChangeNotifier
       }
       _started = false;
       _registrationStatus = RegistrationStatus.offline;
+      _registrationDiagnostic = RegistrationDiagnostic.stopped();
       _setEvent('Registration stopped');
       notifyListeners();
     }
@@ -197,6 +201,15 @@ class PhoneWebVoipController extends ChangeNotifier
   @override
   void transportStateChanged(TransportState state) {
     _transportState = state.state;
+    if (state.state == TransportStateEnum.DISCONNECTED &&
+        !_manualStopRequested) {
+      _registrationDiagnostic = RegistrationDiagnostic.fromTransport(
+        transportState: state.state.name.toLowerCase(),
+        statusCode: state.cause?.status_code,
+        cause: state.cause?.cause,
+        reasonPhrase: state.cause?.reason_phrase,
+      );
+    }
     _setEvent('Transport ${state.state.name.toLowerCase()}');
     notifyListeners();
   }
@@ -208,6 +221,7 @@ class PhoneWebVoipController extends ChangeNotifier
         (state.state == RegistrationStateEnum.REGISTRATION_FAILED ||
             state.state == RegistrationStateEnum.UNREGISTERED)) {
       _registrationStatus = RegistrationStatus.registered;
+      _registrationDiagnostic = RegistrationDiagnostic.registered();
       _started = true;
       _setEvent('Registration registered');
       notifyListeners();
@@ -226,8 +240,24 @@ class PhoneWebVoipController extends ChangeNotifier
     }
     if (_registrationStatus == RegistrationStatus.registered) {
       _manualStopRequested = false;
+      _registrationDiagnostic = RegistrationDiagnostic.registered();
+    } else if (_registrationStatus == RegistrationStatus.registering) {
+      _registrationDiagnostic = RegistrationDiagnostic.registering();
+    } else if (_registrationStatus == RegistrationStatus.failed) {
+      _registrationDiagnostic = RegistrationDiagnostic.fromSipFailure(
+        statusCode: state.cause?.status_code,
+        cause: state.cause?.cause,
+        reasonPhrase: state.cause?.reason_phrase,
+      );
+    } else if (_registrationStatus == RegistrationStatus.offline) {
+      _registrationDiagnostic = RegistrationDiagnostic.stopped();
     }
-    _setEvent('Registration ${_registrationStatus.label.toLowerCase()}');
+    _setEvent(
+      _registrationStatus == RegistrationStatus.failed &&
+              _registrationDiagnostic != null
+          ? _registrationDiagnostic!.summary
+          : 'Registration ${_registrationStatus.label.toLowerCase()}',
+    );
     notifyListeners();
   }
 
