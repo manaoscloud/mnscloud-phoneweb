@@ -1,7 +1,7 @@
 name: mnscloud_phoneweb
 description: Public standalone Flutter WebRTC softphone for SIP over secure WebSocket providers.
 publish_to: "none"
-version: 0.1.11
+version: 0.1.12
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
