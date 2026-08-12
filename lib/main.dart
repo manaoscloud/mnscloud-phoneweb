@@ -369,6 +369,13 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
+  void _dialHistoryEntry(PhoneCallHistoryEntry entry) {
+    setState(() {
+      _dialNumber = _dialableHistoryIdentity(entry.remoteIdentity);
+      _mobileTabIndex = 0;
+    });
+  }
+
   Future<void> _syncNativeContacts() async {
     if (_contactsSyncing) return;
 
@@ -438,6 +445,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onAddContact: () => _openContactDialog(),
         onEditContact: (contact) => _openContactDialog(contact: contact),
         onDialContact: _dialContact,
+        onDialHistoryEntry: _dialHistoryEntry,
         onSyncContacts: _syncNativeContacts,
         contactsSyncing: _contactsSyncing,
         contactsStatus: _contactsStatus,
@@ -482,6 +490,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                                       setState(() {
                                         _selectedAccountId = account.id;
                                       });
+                                      _saveStandaloneAccounts();
                                     },
                                     onToggleRegistration: _toggleRegistration,
                                   ),
@@ -509,6 +518,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                               onClear: _clearDial,
                               onCall: _makeCall,
                               callHistory: _callHistory,
+                              onDialHistoryEntry: _dialHistoryEntry,
                             ),
                           ),
                         ],
@@ -557,7 +567,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onCall: _makeCall,
       ),
       const SizedBox(height: 16),
-      CallHistoryPanel(entries: _callHistory),
+      CallHistoryPanel(entries: _callHistory, onDial: _dialHistoryEntry),
+      const SizedBox(height: 16),
+      const MessagesPanel(),
     ];
   }
 }
@@ -572,6 +584,7 @@ class WorkspacePanels extends StatelessWidget {
     required this.onClear,
     required this.onCall,
     required this.callHistory,
+    required this.onDialHistoryEntry,
     super.key,
   });
 
@@ -583,6 +596,7 @@ class WorkspacePanels extends StatelessWidget {
   final VoidCallback onBackspace;
   final VoidCallback onClear;
   final VoidCallback onCall;
+  final ValueChanged<PhoneCallHistoryEntry> onDialHistoryEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -606,7 +620,18 @@ class WorkspacePanels extends StatelessWidget {
               const SizedBox(width: 16),
               SizedBox(
                 width: 360,
-                child: CallHistoryPanel(entries: callHistory),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: CallHistoryPanel(
+                        entries: callHistory,
+                        onDial: onDialHistoryEntry,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const MessagesPanel(),
+                  ],
+                ),
               ),
             ],
           );
@@ -624,7 +649,9 @@ class WorkspacePanels extends StatelessWidget {
               onCall: onCall,
             ),
             const SizedBox(height: 16),
-            CallHistoryPanel(entries: callHistory),
+            CallHistoryPanel(entries: callHistory, onDial: onDialHistoryEntry),
+            const SizedBox(height: 16),
+            const MessagesPanel(),
           ],
         );
       },
@@ -656,6 +683,7 @@ class MobilePhoneShell extends StatelessWidget {
     required this.onAddContact,
     required this.onEditContact,
     required this.onDialContact,
+    required this.onDialHistoryEntry,
     required this.onSyncContacts,
     required this.contactsSyncing,
     required this.contactsStatus,
@@ -684,6 +712,7 @@ class MobilePhoneShell extends StatelessWidget {
   final VoidCallback onAddContact;
   final ValueChanged<PhoneContact> onEditContact;
   final ValueChanged<PhoneContact> onDialContact;
+  final ValueChanged<PhoneCallHistoryEntry> onDialHistoryEntry;
   final VoidCallback onSyncContacts;
   final bool contactsSyncing;
   final String contactsStatus;
@@ -712,7 +741,7 @@ class MobilePhoneShell extends StatelessWidget {
         contactsSyncing: contactsSyncing,
         contactsStatus: contactsStatus,
       ),
-      MobileHistoryView(entries: callHistory),
+      MobileHistoryView(entries: callHistory, onDial: onDialHistoryEntry),
       const MobileMessagesView(),
     ];
 
@@ -1515,9 +1544,14 @@ class MobileContactsView extends StatelessWidget {
 }
 
 class MobileHistoryView extends StatelessWidget {
-  const MobileHistoryView({required this.entries, super.key});
+  const MobileHistoryView({
+    required this.entries,
+    required this.onDial,
+    super.key,
+  });
 
   final List<PhoneCallHistoryEntry> entries;
+  final ValueChanged<PhoneCallHistoryEntry> onDial;
 
   @override
   Widget build(BuildContext context) {
@@ -1535,7 +1569,7 @@ class MobileHistoryView extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final entry = entries[index];
-        return CallHistoryTile(entry: entry);
+        return CallHistoryTile(entry: entry, onDial: () => onDial(entry));
       },
     );
   }
@@ -1546,10 +1580,9 @@ class MobileMessagesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MobileEmptyTab(
-      icon: Icons.chat_bubble_outline,
-      title: 'Mensagens',
-      message: 'Correio de voz e mensagens ficarao disponiveis aqui.',
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(18, 18, 18, 24),
+      child: MessagesPanel(),
     );
   }
 }
@@ -2336,9 +2369,10 @@ class ActiveCallControls extends StatelessWidget {
 }
 
 class CallHistoryPanel extends StatelessWidget {
-  const CallHistoryPanel({required this.entries, super.key});
+  const CallHistoryPanel({required this.entries, this.onDial, super.key});
 
   final List<PhoneCallHistoryEntry> entries;
+  final ValueChanged<PhoneCallHistoryEntry>? onDial;
 
   @override
   Widget build(BuildContext context) {
@@ -2360,7 +2394,10 @@ class CallHistoryPanel extends StatelessWidget {
                 .map(
                   (entry) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: CallHistoryTile(entry: entry),
+                    child: CallHistoryTile(
+                      entry: entry,
+                      onDial: onDial == null ? null : () => onDial!(entry),
+                    ),
                   ),
                 ),
         ],
@@ -2370,9 +2407,10 @@ class CallHistoryPanel extends StatelessWidget {
 }
 
 class CallHistoryTile extends StatelessWidget {
-  const CallHistoryTile({required this.entry, super.key});
+  const CallHistoryTile({required this.entry, this.onDial, super.key});
 
   final PhoneCallHistoryEntry entry;
+  final VoidCallback? onDial;
 
   @override
   Widget build(BuildContext context) {
@@ -2392,38 +2430,104 @@ class CallHistoryTile extends StatelessWidget {
       PhoneCallStatus.failed => 'Failed',
     };
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+    final summary =
+        '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}';
+    final diagnostic = entry.diagnostic.trim();
+
+    return Material(
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.outlineVariant),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
-      child: ListTile(
-        dense: true,
-        leading: CircleAvatar(
-          radius: 18,
-          backgroundColor: statusColor.withValues(alpha: 0.18),
-          foregroundColor: statusColor,
-          child: Icon(icon, size: 18),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: statusColor.withValues(alpha: 0.18),
+              foregroundColor: statusColor,
+              child: Icon(icon, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          entry.remoteIdentity,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatShortTime(entry.startedAt),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (diagnostic.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      diagnostic,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            IconButton.filledTonal(
+              tooltip: 'Retornar ligação',
+              onPressed: onDial,
+              icon: const Icon(Icons.call_outlined),
+            ),
+          ],
         ),
-        title: Text(
-          entry.remoteIdentity,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          entry.diagnostic.isEmpty
-              ? '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}'
-              : '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)} · ${entry.diagnostic}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Text(
-          _formatShortTime(entry.startedAt),
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-        ),
+      ),
+    );
+  }
+}
+
+class MessagesPanel extends StatelessWidget {
+  const MessagesPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PanelTitle(icon: Icons.chat_bubble_outline, title: 'Mensagens'),
+          SizedBox(height: 12),
+          EmptyState(
+            icon: Icons.chat_bubble_outline,
+            title: 'Mensagens',
+            message: 'Correio de voz e mensagens ficarão disponíveis aqui.',
+          ),
+        ],
       ),
     );
   }
@@ -2446,6 +2550,15 @@ String _formatShortTime(DateTime value) {
     return time;
   }
   return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')} $time';
+}
+
+String _dialableHistoryIdentity(String value) {
+  final trimmed = value.trim();
+  if (trimmed.startsWith('sip:')) {
+    final withoutScheme = trimmed.substring(4);
+    return withoutScheme.split('@').first;
+  }
+  return trimmed.split('@').first;
 }
 
 class ContactsSummaryPanel extends StatelessWidget {
