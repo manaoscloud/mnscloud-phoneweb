@@ -1,23 +1,38 @@
 {
     "name": "MNSCloud PhoneWeb",
     "short_name": "PhoneWeb",
+    "id": ".",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
-    "background_color": "#F7F8F5",
+    "display_override": [
+        "window-controls-overlay",
+        "standalone",
+        "minimal-ui",
+        "browser"
+    ],
+    "background_color": "#101815",
     "theme_color": "#0F766E",
-    "description": "MNSCloud PhoneWeb public WebRTC softphone.",
-    "orientation": "portrait-primary",
+    "description": "MNSCloud PhoneWeb public WebRTC softphone for SIP over secure WebSocket providers.",
+    "categories": [
+        "communication",
+        "productivity",
+        "utilities"
+    ],
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-maskable-192.png",

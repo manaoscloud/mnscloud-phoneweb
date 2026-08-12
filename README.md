@@ -75,6 +75,25 @@ rules. See [Platform Limitations](docs/platform-limitations.md).
 - `freezed` and `json_serializable` for immutable models
 - local sanitized diagnostics logger
 
+## Progressive Web App
+
+PhoneWeb is installable as a Progressive Web App when hosted over HTTPS. The
+source manifest uses relative `id`, `scope`, and `start_url` values so the same
+app remains portable across providers that host it at the domain root or under a
+path.
+
+For the MNSCloud webapps path, build with:
+
+```bash
+flutter build web --release --base-href /phoneweb/
+```
+
+The generated Flutter service worker caches the static app shell. SIP
+registration, calls, diagnostics, WSS, STUN, TURN, and media still require
+network connectivity.
+
+See [Progressive Web App](docs/pwa.md) for hosting and installation details.
+
 ## SIP UA Dependency
 
 PhoneWeb currently vendors `sip_ua` under `third_party/sip_ua` with a minimal
@@ -261,6 +280,7 @@ Use placeholder examples such as `pbx.example.com`, `wss://pbx.example.com/ws`,
 - [Platform Limitations](docs/platform-limitations.md)
 - [Security](docs/security.md)
 - [Diagnostics](docs/diagnostics.md)
+- [Progressive Web App](docs/pwa.md)
 - [Provider Compatibility](docs/provider-compatibility.md)
 - [SDK Strategy](docs/sdk-strategy.md)
 - [Roadmap](docs/roadmap.md)
