@@ -383,7 +383,7 @@ enum WebRtcCodecPolicy {
 
   String get label {
     return switch (this) {
-      WebRtcCodecPolicy.automaticRecommended => 'Automatic recommended',
+      WebRtcCodecPolicy.automaticRecommended => 'Automatic',
       WebRtcCodecPolicy.opusOnly => 'OPUS only',
       WebRtcCodecPolicy.g711Only => 'G.711 only',
     };
