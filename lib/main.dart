@@ -83,7 +83,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   bool _contactsSyncing = false;
   String _contactsStatus = 'Agenda local';
   RuntimeVersionInfo _runtimeVersion = currentRuntimeVersionInfo();
-  bool _standaloneLoaded = false;
+  bool _standaloneDirty = false;
   bool _hadActiveCall = false;
   bool _trackedCallEstablished = false;
   bool _trackedCallIncoming = false;
@@ -128,6 +128,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   Future<void> _loadStandaloneState() async {
     final state = await _store.load();
     if (!mounted) return;
+    if (_standaloneDirty) {
+      return;
+    }
     setState(() {
       _accounts
         ..clear()
@@ -148,7 +151,6 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       _contactsStatus = _contacts.isEmpty
           ? 'Agenda local'
           : '${_contacts.length} contato(s) local(is) salvo(s)';
-      _standaloneLoaded = true;
     });
 
     final account = _selectedAccount;
@@ -158,7 +160,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   Future<void> _saveStandaloneAccounts() {
-    if (!_standaloneLoaded) return Future.value();
+    _standaloneDirty = true;
     return _store.saveAccounts(
       _accounts,
       selectedAccountId: _selectedAccountId,
@@ -166,12 +168,12 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   Future<void> _saveStandaloneContacts() {
-    if (!_standaloneLoaded) return Future.value();
+    _standaloneDirty = true;
     return _store.saveContacts(_contacts);
   }
 
   Future<void> _saveStandaloneHistory() {
-    if (!_standaloneLoaded) return Future.value();
+    _standaloneDirty = true;
     return _store.saveCallHistory(_callHistory);
   }
 
