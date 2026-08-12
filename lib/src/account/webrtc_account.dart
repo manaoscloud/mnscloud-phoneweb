@@ -336,6 +336,48 @@ class WebRtcAccount {
   final RegistrationStatus status;
   final RegistrationDiagnostic? diagnostic;
 
+  factory WebRtcAccount.fromJson(Map<String, dynamic> json) {
+    return WebRtcAccount(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      username: json['username'] as String? ?? '',
+      password: json['password'] as String? ?? '',
+      domain: json['domain'] as String? ?? '',
+      wssServer: json['wssServer'] as String? ?? '',
+      stunServer: json['stunServer'] as String? ?? '',
+      turnServer: json['turnServer'] as String? ?? '',
+      hasPassword: json['hasPassword'] as bool? ?? false,
+      allowInsecureTransport: json['allowInsecureTransport'] as bool? ?? false,
+      codecPolicy: WebRtcCodecPolicy.values.firstWhere(
+        (policy) => policy.name == json['codecPolicy'],
+        orElse: () => WebRtcCodecPolicy.automaticRecommended,
+      ),
+      enabled: json['enabled'] as bool? ?? true,
+      autoRegister: json['autoRegister'] as bool? ?? true,
+      status: RegistrationStatus.offline,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'displayName': displayName,
+      'username': username,
+      'password': password,
+      'domain': domain,
+      'wssServer': wssServer,
+      'stunServer': stunServer,
+      'turnServer': turnServer,
+      'hasPassword': hasPassword,
+      'allowInsecureTransport': allowInsecureTransport,
+      'codecPolicy': codecPolicy.name,
+      'enabled': enabled,
+      'autoRegister': autoRegister,
+    };
+  }
+
   WebRtcAccount copyWith({
     String? id,
     String? name,

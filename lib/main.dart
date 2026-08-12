@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sip_ua/sip_ua.dart';
 
 import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
+import 'src/storage/standalone_phoneweb_store.dart';
 import 'src/version/runtime_version.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
 
@@ -68,6 +70,8 @@ class PhoneWebHomePage extends StatefulWidget {
 class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final List<WebRtcAccount> _accounts = [];
   final List<PhoneContact> _contacts = [];
+  final List<PhoneCallHistoryEntry> _callHistory = [];
+  final StandalonePhoneWebStore _store = StandalonePhoneWebStore();
   final NativeContactsRepository _contactsRepository =
       NativeContactsRepository();
   final KeypadTonePlayer _keypadTonePlayer = KeypadTonePlayer();
@@ -79,12 +83,20 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   bool _contactsSyncing = false;
   String _contactsStatus = 'Agenda local';
   RuntimeVersionInfo _runtimeVersion = currentRuntimeVersionInfo();
+  bool _standaloneLoaded = false;
+  bool _hadActiveCall = false;
+  bool _trackedCallEstablished = false;
+  bool _trackedCallIncoming = false;
+  String _trackedCallRemote = '';
+  String _trackedCallAccountName = '';
+  DateTime? _trackedCallStartedAt;
 
   @override
   void initState() {
     super.initState();
     _voip = PhoneWebVoipController();
     _voip.addListener(_syncVoipState);
+    _loadStandaloneState();
     _refreshRuntimeVersion();
   }
 
@@ -113,6 +125,56 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
+  Future<void> _loadStandaloneState() async {
+    final state = await _store.load();
+    if (!mounted) return;
+    setState(() {
+      _accounts
+        ..clear()
+        ..addAll(state.accounts.where((account) => account.id.isNotEmpty));
+      _contacts
+        ..clear()
+        ..addAll(state.contacts.where((contact) => contact.id.isNotEmpty));
+      _callHistory
+        ..clear()
+        ..addAll(
+          state.callHistory.where((entry) => entry.id.isNotEmpty).take(250),
+        );
+      _selectedAccountId =
+          state.selectedAccountId != null &&
+              _accounts.any((account) => account.id == state.selectedAccountId)
+          ? state.selectedAccountId
+          : (_accounts.isEmpty ? null : _accounts.first.id);
+      _contactsStatus = _contacts.isEmpty
+          ? 'Agenda local'
+          : '${_contacts.length} contato(s) local(is) salvo(s)';
+      _standaloneLoaded = true;
+    });
+
+    final account = _selectedAccount;
+    if (account != null && account.enabled && account.autoRegister) {
+      await _voip.register(account);
+    }
+  }
+
+  Future<void> _saveStandaloneAccounts() {
+    if (!_standaloneLoaded) return Future.value();
+    return _store.saveAccounts(
+      _accounts,
+      selectedAccountId: _selectedAccountId,
+    );
+  }
+
+  Future<void> _saveStandaloneContacts() {
+    if (!_standaloneLoaded) return Future.value();
+    return _store.saveContacts(_contacts);
+  }
+
+  Future<void> _saveStandaloneHistory() {
+    if (!_standaloneLoaded) return Future.value();
+    return _store.saveCallHistory(_callHistory);
+  }
+
   Future<void> _openAccountDialog({WebRtcAccount? account}) async {
     final result = await showDialog<WebRtcAccount>(
       context: context,
@@ -134,13 +196,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         _lastEvent = '${result.name} added';
       }
     });
+    await _saveStandaloneAccounts();
 
     if (result.autoRegister && result.enabled) {
       await _voip.register(result);
     }
   }
 
-  void _removeAccount(WebRtcAccount account) {
+  Future<void> _removeAccount(WebRtcAccount account) async {
     setState(() {
       _accounts.removeWhere((item) => item.id == account.id);
       if (_selectedAccountId == account.id) {
@@ -148,6 +211,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       }
       _lastEvent = '${account.name} removed';
     });
+    await _saveStandaloneAccounts();
   }
 
   Future<void> _toggleRegistration(WebRtcAccount account) async {
@@ -162,6 +226,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
   void _syncVoipState() {
     setState(() {
+      _trackCallState();
       final activeAccount = _voip.account;
       if (activeAccount != null) {
         final index = _accounts.indexWhere(
@@ -170,13 +235,66 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         if (index >= 0) {
           _accounts[index] = _accounts[index].copyWith(
             status: _voip.registrationStatus,
-            enabled: _voip.registrationStatus == RegistrationStatus.registered,
             diagnostic: _voip.registrationDiagnostic,
           );
         }
       }
       _lastEvent = _voip.lastEvent;
     });
+    _saveStandaloneAccounts();
+    _saveStandaloneHistory();
+  }
+
+  void _trackCallState() {
+    if (_voip.hasActiveCall) {
+      if (!_hadActiveCall) {
+        _trackedCallStartedAt = DateTime.now();
+        _trackedCallRemote = _voip.remoteIdentity;
+        _trackedCallIncoming = _voip.activeCallDirection == Direction.incoming;
+        _trackedCallAccountName = _selectedAccount?.name ?? '';
+        _trackedCallEstablished = false;
+      }
+      if (_voip.hasEstablishedCall) {
+        _trackedCallEstablished = true;
+      }
+      _hadActiveCall = true;
+      return;
+    }
+
+    if (!_hadActiveCall) return;
+
+    final startedAt = _trackedCallStartedAt ?? DateTime.now();
+    final duration = DateTime.now().difference(startedAt).inSeconds;
+    final status = _trackedCallEstablished
+        ? PhoneCallStatus.completed
+        : (_trackedCallIncoming
+              ? PhoneCallStatus.missed
+              : PhoneCallStatus.failed);
+    _callHistory.insert(
+      0,
+      PhoneCallHistoryEntry(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        remoteIdentity: _trackedCallRemote.isEmpty
+            ? 'Unknown'
+            : _trackedCallRemote,
+        direction: _trackedCallIncoming
+            ? PhoneCallDirection.incoming
+            : PhoneCallDirection.outgoing,
+        status: status,
+        startedAt: startedAt,
+        durationSeconds: duration < 0 ? 0 : duration,
+        accountName: _trackedCallAccountName,
+      ),
+    );
+    if (_callHistory.length > 250) {
+      _callHistory.removeRange(250, _callHistory.length);
+    }
+    _hadActiveCall = false;
+    _trackedCallEstablished = false;
+    _trackedCallIncoming = false;
+    _trackedCallRemote = '';
+    _trackedCallAccountName = '';
+    _trackedCallStartedAt = null;
   }
 
   void _appendDial(String value) {
@@ -232,6 +350,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       }
       _lastEvent = '${result.name} saved';
     });
+    await _saveStandaloneContacts();
   }
 
   void _dialContact(PhoneContact contact) {
@@ -257,7 +376,8 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       _contactsStatus = result.message;
       _lastEvent = result.message;
 
-      if (result.status == NativeContactsStatus.loaded) {
+      final shouldSaveContacts = result.status == NativeContactsStatus.loaded;
+      if (shouldSaveContacts) {
         final manualContacts = _contacts
             .where((contact) => contact.source == PhoneContactSource.manual)
             .toList();
@@ -267,6 +387,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           ..addAll(result.contacts);
       }
     });
+    if (result.status == NativeContactsStatus.loaded) {
+      await _saveStandaloneContacts();
+    }
+    if (!mounted) return;
 
     ScaffoldMessenger.of(
       context,
@@ -280,6 +404,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       return MobilePhoneShell(
         accounts: _accounts,
         contacts: _contacts,
+        callHistory: _callHistory,
         selectedAccount: _selectedAccount,
         dialNumber: _dialNumber,
         voip: _voip,
@@ -298,6 +423,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           setState(() {
             _selectedAccountId = account.id;
           });
+          _saveStandaloneAccounts();
         },
         onToggleRegistration: _toggleRegistration,
         onAddContact: () => _openContactDialog(),
@@ -373,6 +499,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                               onBackspace: _backspaceDial,
                               onClear: _clearDial,
                               onCall: _makeCall,
+                              callHistory: _callHistory,
                             ),
                           ),
                         ],
@@ -397,6 +524,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           setState(() {
             _selectedAccountId = account.id;
           });
+          _saveStandaloneAccounts();
         },
         onToggleRegistration: _toggleRegistration,
       ),
@@ -420,7 +548,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onCall: _makeCall,
       ),
       const SizedBox(height: 16),
-      const CallHistoryPanel(),
+      CallHistoryPanel(entries: _callHistory),
     ];
   }
 }
@@ -434,12 +562,14 @@ class WorkspacePanels extends StatelessWidget {
     required this.onBackspace,
     required this.onClear,
     required this.onCall,
+    required this.callHistory,
     super.key,
   });
 
   final WebRtcAccount? selectedAccount;
   final String dialNumber;
   final PhoneWebVoipController voip;
+  final List<PhoneCallHistoryEntry> callHistory;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
@@ -465,7 +595,10 @@ class WorkspacePanels extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              const SizedBox(width: 360, child: CallHistoryPanel()),
+              SizedBox(
+                width: 360,
+                child: CallHistoryPanel(entries: callHistory),
+              ),
             ],
           );
         }
@@ -482,7 +615,7 @@ class WorkspacePanels extends StatelessWidget {
               onCall: onCall,
             ),
             const SizedBox(height: 16),
-            const CallHistoryPanel(),
+            CallHistoryPanel(entries: callHistory),
           ],
         );
       },
@@ -494,6 +627,7 @@ class MobilePhoneShell extends StatelessWidget {
   const MobilePhoneShell({
     required this.accounts,
     required this.contacts,
+    required this.callHistory,
     required this.selectedAccount,
     required this.dialNumber,
     required this.voip,
@@ -521,6 +655,7 @@ class MobilePhoneShell extends StatelessWidget {
 
   final List<WebRtcAccount> accounts;
   final List<PhoneContact> contacts;
+  final List<PhoneCallHistoryEntry> callHistory;
   final WebRtcAccount? selectedAccount;
   final String dialNumber;
   final PhoneWebVoipController voip;
@@ -568,7 +703,7 @@ class MobilePhoneShell extends StatelessWidget {
         contactsSyncing: contactsSyncing,
         contactsStatus: contactsStatus,
       ),
-      const MobileHistoryView(),
+      MobileHistoryView(entries: callHistory),
       const MobileMessagesView(),
     ];
 
@@ -751,7 +886,13 @@ class MobileTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentAccount = account;
-    final registered = currentAccount?.status == RegistrationStatus.registered;
+    final statusLabel = switch (currentAccount?.status) {
+      RegistrationStatus.registered => 'Registrado',
+      RegistrationStatus.registering => 'Registrando',
+      RegistrationStatus.failed => 'Falha',
+      RegistrationStatus.offline => 'Sem Serviço',
+      null => 'Sem Serviço',
+    };
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
@@ -788,15 +929,15 @@ class MobileTopBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  registered ? 'Registrado' : 'Sem Servico',
+                  statusLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 Text(
                   currentAccount == null
-                      ? 'Vazio'
-                      : '${currentAccount.username}@${currentAccount.domain}',
+                      ? 'Nenhuma conta'
+                      : currentAccount.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -1365,14 +1506,28 @@ class MobileContactsView extends StatelessWidget {
 }
 
 class MobileHistoryView extends StatelessWidget {
-  const MobileHistoryView({super.key});
+  const MobileHistoryView({required this.entries, super.key});
+
+  final List<PhoneCallHistoryEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    return const MobileEmptyTab(
-      icon: Icons.history,
-      title: 'Historico vazio',
-      message: 'As chamadas realizadas e recebidas aparecerao aqui.',
+    if (entries.isEmpty) {
+      return const MobileEmptyTab(
+        icon: Icons.history,
+        title: 'Histórico vazio',
+        message: 'As chamadas realizadas e recebidas aparecerão aqui.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+      itemCount: entries.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return CallHistoryTile(entry: entry);
+      },
     );
   }
 }
@@ -2172,25 +2327,114 @@ class ActiveCallControls extends StatelessWidget {
 }
 
 class CallHistoryPanel extends StatelessWidget {
-  const CallHistoryPanel({super.key});
+  const CallHistoryPanel({required this.entries, super.key});
+
+  final List<PhoneCallHistoryEntry> entries;
 
   @override
   Widget build(BuildContext context) {
-    return const SectionCard(
+    return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PanelTitle(icon: Icons.history, title: 'Call history'),
-          SizedBox(height: 12),
-          EmptyState(
-            icon: Icons.call_outlined,
-            title: 'No calls yet',
-            message: 'Completed calls will appear here.',
-          ),
+          const PanelTitle(icon: Icons.history, title: 'Call history'),
+          const SizedBox(height: 12),
+          if (entries.isEmpty)
+            const EmptyState(
+              icon: Icons.call_outlined,
+              title: 'No calls yet',
+              message: 'Completed calls will appear here.',
+            )
+          else
+            ...entries
+                .take(8)
+                .map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CallHistoryTile(entry: entry),
+                  ),
+                ),
         ],
       ),
     );
   }
+}
+
+class CallHistoryTile extends StatelessWidget {
+  const CallHistoryTile({required this.entry, super.key});
+
+  final PhoneCallHistoryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final icon = switch (entry.direction) {
+      PhoneCallDirection.incoming => Icons.call_received,
+      PhoneCallDirection.outgoing => Icons.call_made,
+    };
+    final statusColor = switch (entry.status) {
+      PhoneCallStatus.completed => colorScheme.primary,
+      PhoneCallStatus.missed => Colors.orange,
+      PhoneCallStatus.failed => colorScheme.error,
+    };
+    final statusLabel = switch (entry.status) {
+      PhoneCallStatus.completed => 'Completed',
+      PhoneCallStatus.missed => 'Missed',
+      PhoneCallStatus.failed => 'Failed',
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: ListTile(
+        dense: true,
+        leading: CircleAvatar(
+          radius: 18,
+          backgroundColor: statusColor.withValues(alpha: 0.18),
+          foregroundColor: statusColor,
+          child: Icon(icon, size: 18),
+        ),
+        title: Text(
+          entry.remoteIdentity,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Text(
+          _formatShortTime(entry.startedAt),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatCallDurationSeconds(int seconds) {
+  final safeSeconds = seconds < 0 ? 0 : seconds;
+  final minutes = safeSeconds ~/ 60;
+  final remainingSeconds = safeSeconds % 60;
+  return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+}
+
+String _formatShortTime(DateTime value) {
+  final now = DateTime.now();
+  final time =
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  if (value.year == now.year &&
+      value.month == now.month &&
+      value.day == now.day) {
+    return time;
+  }
+  return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')} $time';
 }
 
 class ContactsSummaryPanel extends StatelessWidget {
