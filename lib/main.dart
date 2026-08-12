@@ -2312,6 +2312,7 @@ class _AccountDialogState extends State<AccountDialog> {
   late final TextEditingController _stunController;
   late final TextEditingController _turnController;
   late final TextEditingController _passwordController;
+  WebRtcCodecPolicy _codecPolicy = WebRtcCodecPolicy.automaticRecommended;
   bool _enabled = true;
   bool _autoRegister = true;
   bool _allowInsecureTransport = false;
@@ -2331,6 +2332,8 @@ class _AccountDialogState extends State<AccountDialog> {
     _stunController = TextEditingController(text: account?.stunServer ?? '');
     _turnController = TextEditingController(text: account?.turnServer ?? '');
     _passwordController = TextEditingController(text: account?.password ?? '');
+    _codecPolicy =
+        account?.codecPolicy ?? WebRtcCodecPolicy.automaticRecommended;
     _enabled = account?.enabled ?? true;
     _autoRegister = account?.autoRegister ?? true;
     _allowInsecureTransport = account?.allowInsecureTransport ?? false;
@@ -2459,6 +2462,36 @@ class _AccountDialogState extends State<AccountDialog> {
                           ),
                         ),
                       ),
+                      DialogField(
+                        width: compact ? double.infinity : 348,
+                        child: DropdownButtonFormField<WebRtcCodecPolicy>(
+                          initialValue: _codecPolicy,
+                          decoration: const InputDecoration(
+                            labelText: 'Codec policy',
+                          ),
+                          items: WebRtcCodecPolicy.values
+                              .map(
+                                (policy) => DropdownMenuItem<WebRtcCodecPolicy>(
+                                  value: policy,
+                                  child: Text(policy.label),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) return;
+                            setState(() {
+                              _codecPolicy = value;
+                            });
+                          },
+                        ),
+                      ),
+                      DialogField(
+                        width: compact ? double.infinity : 348,
+                        child: Text(
+                          _codecPolicy.description,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -2571,6 +2604,7 @@ class _AccountDialogState extends State<AccountDialog> {
           _passwordController.text.isNotEmpty ||
           (existing?.hasPassword ?? false),
       allowInsecureTransport: _allowInsecureTransport,
+      codecPolicy: _codecPolicy,
       enabled: _enabled,
       autoRegister: _autoRegister,
       status: existing?.status ?? RegistrationStatus.offline,
