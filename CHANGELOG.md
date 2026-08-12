@@ -7,6 +7,8 @@ initial planning and scaffolding phase.
 
 ## Unreleased
 
+- Added a visible runtime version badge with optional latest-release discovery
+  for MNSCloud-hosted PhoneWeb deployments.
 - Added Progressive Web App manifest hardening, mobile install metadata, PWA
   documentation, and build validation for `/phoneweb/` deployments.
 - Changed unexpected SIP unregistration events to show a retrying
