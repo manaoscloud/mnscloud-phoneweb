@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:sip_ua/sip_ua.dart';
@@ -17,6 +19,7 @@ class PhoneWebVoipController extends ChangeNotifier
   final RTCVideoRenderer _remoteAudio = RTCVideoRenderer();
   final RingtonePlayer _ringtone = RingtonePlayer();
   late final Future<void> _remoteAudioReady;
+  final Map<String, Timer> _terminatedCallGuards = <String, Timer>{};
   WebRtcAccount? _account;
   Call? _activeCall;
   RegistrationStatus _registrationStatus = RegistrationStatus.offline;
@@ -165,6 +168,7 @@ class PhoneWebVoipController extends ChangeNotifier
     if (call == null) return;
 
     _stopRingtone();
+    _guardTerminatedCall(call);
     call.hangup();
     _clearActiveCall(CallStateEnum.ENDED);
     _setEvent('Call ended');
@@ -293,6 +297,12 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void callStateChanged(Call call, CallState state) {
+    if (_isGuardedTerminatedCall(call)) {
+      _setEvent('Ignored stale call ${state.state.name.toLowerCase()}');
+      notifyListeners();
+      return;
+    }
+
     if (_shouldRejectBusy(call, state)) {
       _setEvent('Rejected overlapping incoming call');
       call.hangup({'status_code': 486, 'reason_phrase': 'Busy Here'});
@@ -306,6 +316,7 @@ class PhoneWebVoipController extends ChangeNotifier
       case CallStateEnum.NONE:
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
+        _unguardTerminatedCall(call);
         _clearActiveCall(state.state);
       case CallStateEnum.MUTED:
         _activeCall = call;
@@ -368,6 +379,10 @@ class PhoneWebVoipController extends ChangeNotifier
     _ringtone.dispose();
     _clearRemoteAudio();
     _remoteAudioReady.whenComplete(_remoteAudio.dispose);
+    for (final timer in _terminatedCallGuards.values) {
+      timer.cancel();
+    }
+    _terminatedCallGuards.clear();
     if (_started) {
       _helper.stop();
     }
@@ -515,6 +530,32 @@ class PhoneWebVoipController extends ChangeNotifier
     if (call.direction != Direction.incoming) return false;
     return state.state == CallStateEnum.CALL_INITIATION ||
         state.state == CallStateEnum.PROGRESS;
+  }
+
+  void _guardTerminatedCall(Call call) {
+    final id = _callGuardId(call);
+    if (id == null) return;
+    _terminatedCallGuards.remove(id)?.cancel();
+    _terminatedCallGuards[id] = Timer(const Duration(minutes: 3), () {
+      _terminatedCallGuards.remove(id);
+    });
+  }
+
+  void _unguardTerminatedCall(Call call) {
+    final id = _callGuardId(call);
+    if (id == null) return;
+    _terminatedCallGuards.remove(id)?.cancel();
+  }
+
+  bool _isGuardedTerminatedCall(Call call) {
+    final id = _callGuardId(call);
+    return id != null && _terminatedCallGuards.containsKey(id);
+  }
+
+  String? _callGuardId(Call call) {
+    final id = call.id?.trim();
+    if (id == null || id.isEmpty) return null;
+    return id;
   }
 
   void _clearActiveCall(CallStateEnum state) {
