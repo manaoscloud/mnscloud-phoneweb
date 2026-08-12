@@ -10,6 +10,8 @@ import 'src/storage/standalone_phoneweb_store.dart';
 import 'src/version/runtime_version.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
 
+const double _desktopSideFooterHeight = 260;
+
 void main() {
   runApp(const PhoneWebApp());
 }
@@ -496,13 +498,16 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                ContactsSummaryPanel(
-                                  contacts: _contacts,
-                                  contactsSyncing: _contactsSyncing,
-                                  contactsStatus: _contactsStatus,
-                                  onAddContact: () => _openContactDialog(),
-                                  onSyncContacts: _syncNativeContacts,
-                                  onDialContact: _dialContact,
+                                SizedBox(
+                                  height: _desktopSideFooterHeight,
+                                  child: ContactsSummaryPanel(
+                                    contacts: _contacts,
+                                    contactsSyncing: _contactsSyncing,
+                                    contactsStatus: _contactsStatus,
+                                    onAddContact: () => _openContactDialog(),
+                                    onSyncContacts: _syncNativeContacts,
+                                    onDialContact: _dialContact,
+                                  ),
                                 ),
                               ],
                             ),
@@ -629,7 +634,10 @@ class WorkspacePanels extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const MessagesPanel(),
+                    const SizedBox(
+                      height: _desktopSideFooterHeight,
+                      child: MessagesPanel(),
+                    ),
                   ],
                 ),
               ),
@@ -2585,82 +2593,84 @@ class ContactsSummaryPanel extends StatelessWidget {
     final previewContacts = contacts.take(4).toList();
 
     return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: PanelTitle(
-                  icon: Icons.contacts_outlined,
-                  title: 'Contacts',
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: PanelTitle(
+                    icon: Icons.contacts_outlined,
+                    title: 'Contacts',
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: contactsSyncing ? null : onSyncContacts,
-                tooltip: 'Sync device contacts',
-                icon: contactsSyncing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.sync_outlined),
-              ),
-              IconButton(
-                onPressed: onAddContact,
-                tooltip: 'Add contact',
-                icon: const Icon(Icons.add),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            contactsStatus,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+                IconButton(
+                  onPressed: contactsSyncing ? null : onSyncContacts,
+                  tooltip: 'Sync device contacts',
+                  icon: contactsSyncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.sync_outlined),
+                ),
+                IconButton(
+                  onPressed: onAddContact,
+                  tooltip: 'Add contact',
+                  icon: const Icon(Icons.add),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          if (previewContacts.isEmpty)
-            EmptyState(
-              icon: Icons.contacts_outlined,
-              title: 'No contacts yet',
-              message: 'Sync the device address book or add a local contact.',
-              actionLabel: 'Sync contacts',
-              onAction: contactsSyncing ? null : onSyncContacts,
-            )
-          else
-            ...previewContacts.map(
-              (contact) => ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: colorScheme.primaryContainer,
-                  foregroundColor: colorScheme.onPrimaryContainer,
-                  child: Text(contact.name.isEmpty ? '?' : contact.name[0]),
-                ),
-                title: Text(
-                  contact.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  contact.number,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: IconButton(
-                  onPressed: () => onDialContact(contact),
-                  icon: const Icon(Icons.call_outlined),
-                ),
+            const SizedBox(height: 8),
+            Text(
+              contactsStatus,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-        ],
+            const SizedBox(height: 12),
+            if (previewContacts.isEmpty)
+              EmptyState(
+                icon: Icons.contacts_outlined,
+                title: 'No contacts yet',
+                message: 'Sync the device address book or add a local contact.',
+                actionLabel: 'Sync contacts',
+                onAction: contactsSyncing ? null : onSyncContacts,
+              )
+            else
+              ...previewContacts.map(
+                (contact) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: colorScheme.primaryContainer,
+                    foregroundColor: colorScheme.onPrimaryContainer,
+                    child: Text(contact.name.isEmpty ? '?' : contact.name[0]),
+                  ),
+                  title: Text(
+                    contact.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    contact.number,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    onPressed: () => onDialContact(contact),
+                    icon: const Icon(Icons.call_outlined),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
