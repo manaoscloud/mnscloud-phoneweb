@@ -7,6 +7,8 @@ initial planning and scaffolding phase.
 
 ## Unreleased
 
+- Added Progressive Web App manifest hardening, mobile install metadata, PWA
+  documentation, and build validation for `/phoneweb/` deployments.
 - Changed unexpected SIP unregistration events to show a retrying
   registration interruption instead of a manual stopped/offline state.
 - Added safe SIP registration diagnostics with user-facing failure reasons,
