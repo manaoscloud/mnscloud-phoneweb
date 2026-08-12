@@ -46,6 +46,7 @@ class PhoneWebVoipController extends ChangeNotifier
   Duration get callDuration => _callDuration;
   bool get isRegistered => _helper.registered;
   bool get hasActiveCall => _activeCall != null;
+  Direction? get activeCallDirection => _activeCall?.direction;
   bool get hasEstablishedCall =>
       _activeCall != null &&
       (_callState == CallStateEnum.ACCEPTED ||
