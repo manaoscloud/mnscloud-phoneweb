@@ -20,8 +20,11 @@ class PhoneWebVoipController extends ChangeNotifier
   final RingtonePlayer _ringtone = RingtonePlayer();
   late final Future<void> _remoteAudioReady;
   final Map<String, Timer> _terminatedCallGuards = <String, Timer>{};
+  Timer? _callDurationTimer;
   WebRtcAccount? _account;
   Call? _activeCall;
+  DateTime? _callStartedAt;
+  Duration _callDuration = Duration.zero;
   RegistrationStatus _registrationStatus = RegistrationStatus.offline;
   RegistrationDiagnostic? _registrationDiagnostic;
   TransportStateEnum _transportState = TransportStateEnum.NONE;
@@ -40,6 +43,7 @@ class PhoneWebVoipController extends ChangeNotifier
   String get lastEvent => _lastEvent;
   bool get muted => _muted;
   bool get onHold => _onHold;
+  Duration get callDuration => _callDuration;
   bool get isRegistered => _helper.registered;
   bool get hasActiveCall => _activeCall != null;
   bool get hasEstablishedCall =>
@@ -59,6 +63,23 @@ class PhoneWebVoipController extends ChangeNotifier
       _callState != CallStateEnum.ENDED &&
       _callState != CallStateEnum.NONE;
   String get remoteIdentity => _activeCall?.remote_identity ?? '';
+  String get formattedCallDuration {
+    final totalSeconds = _callDuration.inSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return [
+        hours.toString().padLeft(2, '0'),
+        minutes.toString().padLeft(2, '0'),
+        seconds.toString().padLeft(2, '0'),
+      ].join(':');
+    }
+    return [
+      minutes.toString().padLeft(2, '0'),
+      seconds.toString().padLeft(2, '0'),
+    ].join(':');
+  }
 
   Future<void> register(WebRtcAccount account) async {
     final password = account.password.trim();
@@ -158,8 +179,11 @@ class PhoneWebVoipController extends ChangeNotifier
     if (call == null) return;
 
     final stream = await _microphoneStream();
+    _setEvent('Answering call');
+    notifyListeners();
     call.answer(_callOptions(_account), mediaStream: stream);
-    _setEvent('Call answered');
+    _startCallDuration();
+    _setEvent('Call answer requested');
     notifyListeners();
   }
 
@@ -340,9 +364,11 @@ class PhoneWebVoipController extends ChangeNotifier
       case CallStateEnum.CONFIRMED:
         _activeCall = call;
         _stopRingtone();
+        _startCallDuration();
       case CallStateEnum.STREAM:
         _activeCall = call;
         _stopRingtone();
+        _startCallDuration();
         if (state.stream != null && state.originator == Originator.remote) {
           _attachRemoteStream(state.stream!);
         }
@@ -379,6 +405,7 @@ class PhoneWebVoipController extends ChangeNotifier
     _ringtone.dispose();
     _clearRemoteAudio();
     _remoteAudioReady.whenComplete(_remoteAudio.dispose);
+    _stopCallDuration();
     for (final timer in _terminatedCallGuards.values) {
       timer.cancel();
     }
@@ -560,11 +587,30 @@ class PhoneWebVoipController extends ChangeNotifier
 
   void _clearActiveCall(CallStateEnum state) {
     _stopRingtone();
+    _stopCallDuration();
     _clearRemoteAudio();
     _activeCall = null;
     _callState = state;
     _muted = false;
     _onHold = false;
+  }
+
+  void _startCallDuration() {
+    _callStartedAt ??= DateTime.now();
+    _callDuration = DateTime.now().difference(_callStartedAt!);
+    _callDurationTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      final startedAt = _callStartedAt;
+      if (startedAt == null) return;
+      _callDuration = DateTime.now().difference(startedAt);
+      notifyListeners();
+    });
+  }
+
+  void _stopCallDuration() {
+    _callDurationTimer?.cancel();
+    _callDurationTimer = null;
+    _callStartedAt = null;
+    _callDuration = Duration.zero;
   }
 
   void _startRingtone() {
