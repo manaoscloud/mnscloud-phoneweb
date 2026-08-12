@@ -2475,7 +2475,7 @@ class _AccountDialogState extends State<AccountDialog> {
                         ),
                       ),
                       DialogField(
-                        width: compact ? double.infinity : 348,
+                        width: compact ? double.infinity : 464,
                         child: Text(
                           _codecPolicy.description,
                           style: Theme.of(context).textTheme.bodySmall,
