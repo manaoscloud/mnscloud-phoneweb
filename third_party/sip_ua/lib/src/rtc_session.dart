@@ -3209,12 +3209,75 @@ class RTCSession extends EventManager implements Owner {
 
     for (dynamic element in sdp['media']) {
       if (element['type'] != 'text') {
+        if (element['type'] == 'audio') {
+          _keepWebRtcCompatibleAudioPayloads(element);
+        }
         mediaList.add(element);
       }
     }
     sdp['media'] = mediaList;
 
     return sdp_transform.write(sdp, null);
+  }
+
+  void _keepWebRtcCompatibleAudioPayloads(Map<String, dynamic> media) {
+    const compatibleCodecs = <String>{
+      'opus',
+      'pcmu',
+      'pcma',
+      'telephone-event',
+      'cn',
+    };
+
+    final rtp = media['rtp'];
+    if (rtp is! List) {
+      return;
+    }
+
+    final compatiblePayloads = <int>{};
+    for (final item in rtp) {
+      if (item is! Map) continue;
+      final payload = item['payload'];
+      final codec = item['codec']?.toString().toLowerCase();
+      if (payload is int && codec != null && compatibleCodecs.contains(codec)) {
+        compatiblePayloads.add(payload);
+      }
+    }
+
+    if (compatiblePayloads.isEmpty) {
+      return;
+    }
+
+    final payloads = media['payloads'];
+    if (payloads is String) {
+      media['payloads'] = payloads
+          .split(RegExp(r'\s+'))
+          .where(
+              (payload) => compatiblePayloads.contains(int.tryParse(payload)))
+          .join(' ');
+    } else if (payloads is List) {
+      media['payloads'] = payloads.where((payload) {
+        if (payload is int) return compatiblePayloads.contains(payload);
+        return compatiblePayloads.contains(int.tryParse(payload.toString()));
+      }).toList();
+    }
+
+    media['rtp'] = rtp.where((item) {
+      if (item is! Map) return false;
+      final payload = item['payload'];
+      return payload is int && compatiblePayloads.contains(payload);
+    }).toList();
+
+    for (final key in ['fmtp', 'rtcpFb']) {
+      final values = media[key];
+      if (values is List) {
+        media[key] = values.where((item) {
+          if (item is! Map) return false;
+          final payload = item['payload'];
+          return payload is int && compatiblePayloads.contains(payload);
+        }).toList();
+      }
+    }
   }
 
   void _setLocalMediaStatus() {

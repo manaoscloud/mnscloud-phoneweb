@@ -2119,6 +2119,16 @@ class ActiveCallControls extends StatelessWidget {
                   ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
+              if (voip.hasEstablishedCall) ...[
+                const SizedBox(width: 10),
+                Text(
+                  voip.formattedCallDuration,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
