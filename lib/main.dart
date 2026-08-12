@@ -5,6 +5,7 @@ import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
+import 'src/version/runtime_version.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
 
 void main() {
@@ -77,12 +78,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   int _mobileTabIndex = 0;
   bool _contactsSyncing = false;
   String _contactsStatus = 'Agenda local';
+  RuntimeVersionInfo _runtimeVersion = currentRuntimeVersionInfo();
 
   @override
   void initState() {
     super.initState();
     _voip = PhoneWebVoipController();
     _voip.addListener(_syncVoipState);
+    _refreshRuntimeVersion();
   }
 
   @override
@@ -100,6 +103,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       }
     }
     return _accounts.isEmpty ? null : _accounts.first;
+  }
+
+  Future<void> _refreshRuntimeVersion() async {
+    final versionInfo = await loadRuntimeVersionInfo();
+    if (!mounted) return;
+    setState(() {
+      _runtimeVersion = versionInfo;
+    });
   }
 
   Future<void> _openAccountDialog({WebRtcAccount? account}) async {
@@ -274,6 +285,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         voip: _voip,
         currentIndex: _mobileTabIndex,
         lastEvent: _lastEvent,
+        runtimeVersion: _runtimeVersion,
         onTabChanged: (index) => setState(() => _mobileTabIndex = index),
         onAppend: _appendDial,
         onBackspace: _backspaceDial,
@@ -308,6 +320,8 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
             children: [
               AppHeader(
                 accountCount: _accounts.length,
+                runtimeVersion: _runtimeVersion,
+                onRefreshVersion: _refreshRuntimeVersion,
                 onAddAccount: () => _openAccountDialog(),
               ),
               const SizedBox(height: 20),
@@ -485,6 +499,7 @@ class MobilePhoneShell extends StatelessWidget {
     required this.voip,
     required this.currentIndex,
     required this.lastEvent,
+    required this.runtimeVersion,
     required this.onTabChanged,
     required this.onAppend,
     required this.onBackspace,
@@ -511,6 +526,7 @@ class MobilePhoneShell extends StatelessWidget {
   final PhoneWebVoipController voip;
   final int currentIndex;
   final String lastEvent;
+  final RuntimeVersionInfo runtimeVersion;
   final ValueChanged<int> onTabChanged;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
@@ -564,6 +580,7 @@ class MobilePhoneShell extends StatelessWidget {
             MobileTopBar(
               account: selectedAccount,
               accountCount: accounts.length,
+              runtimeVersion: runtimeVersion,
               onAccounts: () => _showAccountsSheet(context),
             ),
             Expanded(child: pages[currentIndex]),
@@ -721,12 +738,14 @@ class MobileTopBar extends StatelessWidget {
   const MobileTopBar({
     required this.account,
     required this.accountCount,
+    required this.runtimeVersion,
     required this.onAccounts,
     super.key,
   });
 
   final WebRtcAccount? account;
   final int accountCount;
+  final RuntimeVersionInfo runtimeVersion;
   final VoidCallback onAccounts;
 
   @override
@@ -787,11 +806,11 @@ class MobileTopBar extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(
-            width: 48,
+          SizedBox(
+            width: 82,
             child: Align(
               alignment: Alignment.centerRight,
-              child: Icon(Icons.person_outline, size: 24),
+              child: VersionBadge(versionInfo: runtimeVersion, compact: true),
             ),
           ),
         ],
@@ -1416,11 +1435,15 @@ class MobileEmptyTab extends StatelessWidget {
 class AppHeader extends StatelessWidget {
   const AppHeader({
     required this.accountCount,
+    required this.runtimeVersion,
+    required this.onRefreshVersion,
     required this.onAddAccount,
     super.key,
   });
 
   final int accountCount;
+  final RuntimeVersionInfo runtimeVersion;
+  final VoidCallback onRefreshVersion;
   final VoidCallback onAddAccount;
 
   @override
@@ -1456,12 +1479,105 @@ class AppHeader extends StatelessWidget {
           height: compact ? 14 : 0,
           width: compact ? double.infinity : 0,
         ),
-        FilledButton.icon(
-          onPressed: onAddAccount,
-          icon: const Icon(Icons.add),
-          label: const Text('Add account'),
+        Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: compact ? WrapAlignment.start : WrapAlignment.end,
+          children: [
+            VersionBadge(
+              versionInfo: runtimeVersion,
+              onRefresh: onRefreshVersion,
+            ),
+            FilledButton.icon(
+              onPressed: onAddAccount,
+              icon: const Icon(Icons.add),
+              label: const Text('Add account'),
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class VersionBadge extends StatelessWidget {
+  const VersionBadge({
+    required this.versionInfo,
+    this.compact = false,
+    this.onRefresh,
+    super.key,
+  });
+
+  final RuntimeVersionInfo versionInfo;
+  final bool compact;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final updateAvailable = versionInfo.updateAvailable;
+    final foreground = updateAvailable
+        ? colorScheme.onTertiaryContainer
+        : colorScheme.onSurfaceVariant;
+    final background = updateAvailable
+        ? colorScheme.tertiaryContainer
+        : colorScheme.surfaceContainerHighest;
+    final borderColor = updateAvailable
+        ? colorScheme.tertiary
+        : colorScheme.outlineVariant;
+    final current = versionInfo.displayVersion;
+    final latest = versionInfo.latestVersion;
+    final tooltip = updateAvailable
+        ? 'Current $current · New version v$latest available'
+        : latest == null
+        ? 'Current $current'
+        : 'Current $current · Latest v$latest';
+
+    final badge = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 9 : 12,
+        vertical: compact ? 6 : 8,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            updateAvailable ? Icons.system_update_alt : Icons.verified_outlined,
+            size: compact ? 14 : 16,
+            color: foreground,
+          ),
+          SizedBox(width: compact ? 4 : 6),
+          Text(
+            compact
+                ? current
+                : updateAvailable
+                ? '$current → v$latest'
+                : current,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Tooltip(
+      message: tooltip,
+      child: onRefresh == null
+          ? badge
+          : InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: onRefresh,
+              child: badge,
+            ),
     );
   }
 }
