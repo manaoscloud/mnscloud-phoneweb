@@ -1595,7 +1595,6 @@ class AccountTile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  StatusChip(status: account.status),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1607,11 +1606,7 @@ class AccountTile extends StatelessWidget {
               ),
               if (account.diagnostic != null) ...[
                 const SizedBox(height: 10),
-                RegistrationDiagnosticBanner(
-                  diagnostic: account.diagnostic!,
-                  onDetails: () =>
-                      _showRegistrationDiagnosticDialog(context, account),
-                ),
+                RegistrationDiagnosticBanner(diagnostic: account.diagnostic!),
               ],
               const SizedBox(height: 12),
               Row(
@@ -1658,14 +1653,9 @@ class AccountTile extends StatelessWidget {
 }
 
 class RegistrationDiagnosticBanner extends StatelessWidget {
-  const RegistrationDiagnosticBanner({
-    required this.diagnostic,
-    required this.onDetails,
-    super.key,
-  });
+  const RegistrationDiagnosticBanner({required this.diagnostic, super.key});
 
   final RegistrationDiagnostic diagnostic;
-  final VoidCallback onDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -1709,7 +1699,6 @@ class RegistrationDiagnosticBanner extends StatelessWidget {
                 ),
               ),
             ),
-            TextButton(onPressed: onDetails, child: const Text('Details')),
           ],
         ),
       ),
@@ -2383,7 +2372,7 @@ class _AccountDialogState extends State<AccountDialog> {
                     runSpacing: 16,
                     children: [
                       DialogField(
-                        width: compact ? double.infinity : 348,
+                        width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _nameController,
                           decoration: const InputDecoration(
@@ -2393,7 +2382,7 @@ class _AccountDialogState extends State<AccountDialog> {
                         ),
                       ),
                       DialogField(
-                        width: compact ? double.infinity : 348,
+                        width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _displayNameController,
                           decoration: const InputDecoration(
@@ -2463,7 +2452,7 @@ class _AccountDialogState extends State<AccountDialog> {
                         ),
                       ),
                       DialogField(
-                        width: compact ? double.infinity : 348,
+                        width: compact ? double.infinity : 224,
                         child: DropdownButtonFormField<WebRtcCodecPolicy>(
                           initialValue: _codecPolicy,
                           decoration: const InputDecoration(
