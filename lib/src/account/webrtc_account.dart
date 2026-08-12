@@ -312,6 +312,7 @@ class WebRtcAccount {
     required this.turnServer,
     required this.hasPassword,
     required this.allowInsecureTransport,
+    required this.codecPolicy,
     required this.enabled,
     required this.autoRegister,
     required this.status,
@@ -329,6 +330,7 @@ class WebRtcAccount {
   final String turnServer;
   final bool hasPassword;
   final bool allowInsecureTransport;
+  final WebRtcCodecPolicy codecPolicy;
   final bool enabled;
   final bool autoRegister;
   final RegistrationStatus status;
@@ -346,6 +348,7 @@ class WebRtcAccount {
     String? turnServer,
     bool? hasPassword,
     bool? allowInsecureTransport,
+    WebRtcCodecPolicy? codecPolicy,
     bool? enabled,
     bool? autoRegister,
     RegistrationStatus? status,
@@ -364,10 +367,44 @@ class WebRtcAccount {
       hasPassword: hasPassword ?? this.hasPassword,
       allowInsecureTransport:
           allowInsecureTransport ?? this.allowInsecureTransport,
+      codecPolicy: codecPolicy ?? this.codecPolicy,
       enabled: enabled ?? this.enabled,
       autoRegister: autoRegister ?? this.autoRegister,
       status: status ?? this.status,
       diagnostic: diagnostic ?? this.diagnostic,
     );
+  }
+}
+
+enum WebRtcCodecPolicy {
+  automaticRecommended,
+  opusOnly,
+  g711Only;
+
+  String get label {
+    return switch (this) {
+      WebRtcCodecPolicy.automaticRecommended => 'Automatic recommended',
+      WebRtcCodecPolicy.opusOnly => 'OPUS only',
+      WebRtcCodecPolicy.g711Only => 'G.711 only',
+    };
+  }
+
+  String get description {
+    return switch (this) {
+      WebRtcCodecPolicy.automaticRecommended =>
+        'Prefers OPUS and allows PCMU/PCMA fallback for SIP trunks.',
+      WebRtcCodecPolicy.opusOnly =>
+        'Uses OPUS only. Best for WebRTC-to-WebRTC calls.',
+      WebRtcCodecPolicy.g711Only =>
+        'Uses PCMU/PCMA only for legacy SIP trunk compatibility.',
+    };
+  }
+
+  Set<String> get allowedAudioCodecs {
+    return switch (this) {
+      WebRtcCodecPolicy.automaticRecommended => {'opus', 'pcmu', 'pcma'},
+      WebRtcCodecPolicy.opusOnly => {'opus'},
+      WebRtcCodecPolicy.g711Only => {'pcmu', 'pcma'},
+    };
   }
 }

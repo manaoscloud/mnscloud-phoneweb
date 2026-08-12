@@ -138,6 +138,7 @@ class PhoneWebVoipController extends ChangeNotifier
     final started = await _helper.call(
       target,
       voiceOnly: true,
+      customOptions: _callOptions(currentAccount),
       mediaStream: stream,
     );
     _setEvent(started ? 'Calling $target' : 'Call could not be started');
@@ -149,7 +150,7 @@ class PhoneWebVoipController extends ChangeNotifier
     if (call == null) return;
 
     final stream = await _microphoneStream();
-    call.answer(_helper.buildCallOptions(true), mediaStream: stream);
+    call.answer(_callOptions(_account), mediaStream: stream);
     _setEvent('Call answered');
     notifyListeners();
   }
@@ -372,6 +373,113 @@ class PhoneWebVoipController extends ChangeNotifier
       'audio': true,
       'video': false,
     });
+  }
+
+  Map<String, dynamic> _callOptions(WebRtcAccount? account) {
+    final options = _helper.buildCallOptions(true);
+    final policy =
+        account?.codecPolicy ?? WebRtcCodecPolicy.automaticRecommended;
+    final modifier = _codecPolicyModifier(policy);
+
+    final rtcOfferConstraints = Map<String, dynamic>.from(
+      options['rtcOfferConstraints'] as Map,
+    );
+    final rtcAnswerConstraints = Map<String, dynamic>.from(
+      options['rtcAnswerConstraints'] as Map,
+    );
+    rtcOfferConstraints['offerModifiers'] = [modifier];
+    rtcAnswerConstraints['offerModifiers'] = [modifier];
+
+    return {
+      ...options,
+      'rtcOfferConstraints': rtcOfferConstraints,
+      'rtcAnswerConstraints': rtcAnswerConstraints,
+    };
+  }
+
+  Future<RTCSessionDescription> Function(RTCSessionDescription)
+  _codecPolicyModifier(WebRtcCodecPolicy policy) {
+    return (description) async {
+      final sdp = description.sdp;
+      if (sdp == null || sdp.isEmpty) return description;
+      return RTCSessionDescription(
+        _filterAudioCodecs(sdp, policy.allowedAudioCodecs),
+        description.type,
+      );
+    };
+  }
+
+  String _filterAudioCodecs(String sdp, Set<String> allowedCodecs) {
+    final lines = sdp.split(RegExp(r'\r?\n'));
+    final payloadCodecs = <String, String>{};
+    final audioPayloads = <String>{};
+    var inAudio = false;
+
+    for (final line in lines) {
+      if (line.startsWith('m=')) {
+        inAudio = line.startsWith('m=audio ');
+        if (inAudio) {
+          final parts = line.split(RegExp(r'\s+'));
+          audioPayloads
+            ..clear()
+            ..addAll(parts.skip(3));
+        }
+        continue;
+      }
+
+      if (!inAudio) continue;
+      final match = RegExp(r'^a=rtpmap:([0-9]+)\s+([^/]+)/').firstMatch(line);
+      if (match == null) continue;
+      payloadCodecs[match.group(1)!] = match.group(2)!.toLowerCase();
+    }
+
+    final allowedPayloads = audioPayloads.where((payload) {
+      final codec = payloadCodecs[payload]?.toLowerCase();
+      return codec == null ||
+          allowedCodecs.contains(codec) ||
+          codec == 'telephone-event';
+    }).toSet();
+
+    if (allowedPayloads.isEmpty) return sdp;
+
+    final filtered = <String>[];
+    inAudio = false;
+
+    for (final line in lines) {
+      if (line.startsWith('m=')) {
+        inAudio = line.startsWith('m=audio ');
+        if (inAudio) {
+          final parts = line.split(RegExp(r'\s+'));
+          final retained = parts.skip(3).where(allowedPayloads.contains);
+          filtered.add([...parts.take(3), ...retained].join(' '));
+          continue;
+        }
+      }
+
+      if (inAudio && _isPayloadAttribute(line)) {
+        final payload = _payloadFromAttribute(line);
+        if (payload != null && !allowedPayloads.contains(payload)) {
+          continue;
+        }
+      }
+
+      filtered.add(line);
+    }
+
+    return filtered.join('\r\n');
+  }
+
+  bool _isPayloadAttribute(String line) {
+    return line.startsWith('a=rtpmap:') ||
+        line.startsWith('a=fmtp:') ||
+        line.startsWith('a=rtcp-fb:');
+  }
+
+  String? _payloadFromAttribute(String line) {
+    final match = RegExp(
+      r'^a=(?:rtpmap|fmtp|rtcp-fb):([0-9]+)',
+    ).firstMatch(line);
+    return match?.group(1);
   }
 
   void _setEvent(String event) {
