@@ -3,15 +3,20 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:sip_ua/sip_ua.dart';
 
 import '../account/webrtc_account.dart';
+import '../audio/ringtone_player.dart';
 
 class PhoneWebVoipController extends ChangeNotifier
     implements SipUaHelperListener {
   PhoneWebVoipController({SIPUAHelper? helper})
     : _helper = helper ?? SIPUAHelper() {
     _helper.addSipUaHelperListener(this);
+    _remoteAudioReady = _remoteAudio.initialize();
   }
 
   final SIPUAHelper _helper;
+  final RTCVideoRenderer _remoteAudio = RTCVideoRenderer();
+  final RingtonePlayer _ringtone = RingtonePlayer();
+  late final Future<void> _remoteAudioReady;
   WebRtcAccount? _account;
   Call? _activeCall;
   RegistrationStatus _registrationStatus = RegistrationStatus.offline;
@@ -159,11 +164,9 @@ class PhoneWebVoipController extends ChangeNotifier
     final call = _activeCall;
     if (call == null) return;
 
+    _stopRingtone();
     call.hangup();
-    _activeCall = null;
-    _callState = CallStateEnum.ENDED;
-    _muted = false;
-    _onHold = false;
+    _clearActiveCall(CallStateEnum.ENDED);
     _setEvent('Call ended');
     notifyListeners();
   }
@@ -290,15 +293,20 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void callStateChanged(Call call, CallState state) {
+    if (_shouldRejectBusy(call, state)) {
+      _setEvent('Rejected overlapping incoming call');
+      call.hangup({'status_code': 486, 'reason_phrase': 'Busy Here'});
+      notifyListeners();
+      return;
+    }
+
     _callState = state.state;
 
     switch (state.state) {
       case CallStateEnum.NONE:
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
-        _activeCall = null;
-        _muted = false;
-        _onHold = false;
+        _clearActiveCall(state.state);
       case CallStateEnum.MUTED:
         _activeCall = call;
         _muted = true;
@@ -311,6 +319,22 @@ class PhoneWebVoipController extends ChangeNotifier
       case CallStateEnum.UNHOLD:
         _activeCall = call;
         _onHold = false;
+      case CallStateEnum.CALL_INITIATION:
+      case CallStateEnum.PROGRESS:
+        _activeCall = call;
+        if (call.direction == Direction.incoming) {
+          _startRingtone();
+        }
+      case CallStateEnum.ACCEPTED:
+      case CallStateEnum.CONFIRMED:
+        _activeCall = call;
+        _stopRingtone();
+      case CallStateEnum.STREAM:
+        _activeCall = call;
+        _stopRingtone();
+        if (state.stream != null && state.originator == Originator.remote) {
+          _attachRemoteStream(state.stream!);
+        }
       default:
         _activeCall = call;
         break;
@@ -341,6 +365,9 @@ class PhoneWebVoipController extends ChangeNotifier
   @override
   void dispose() {
     _helper.removeSipUaHelperListener(this);
+    _ringtone.dispose();
+    _clearRemoteAudio();
+    _remoteAudioReady.whenComplete(_remoteAudio.dispose);
     if (_started) {
       _helper.stop();
     }
@@ -480,6 +507,51 @@ class PhoneWebVoipController extends ChangeNotifier
       r'^a=(?:rtpmap|fmtp|rtcp-fb):([0-9]+)',
     ).firstMatch(line);
     return match?.group(1);
+  }
+
+  bool _shouldRejectBusy(Call call, CallState state) {
+    final active = _activeCall;
+    if (active == null || active.id == call.id) return false;
+    if (call.direction != Direction.incoming) return false;
+    return state.state == CallStateEnum.CALL_INITIATION ||
+        state.state == CallStateEnum.PROGRESS;
+  }
+
+  void _clearActiveCall(CallStateEnum state) {
+    _stopRingtone();
+    _clearRemoteAudio();
+    _activeCall = null;
+    _callState = state;
+    _muted = false;
+    _onHold = false;
+  }
+
+  void _startRingtone() {
+    _ringtone.start();
+  }
+
+  void _stopRingtone() {
+    _ringtone.stop();
+  }
+
+  void _attachRemoteStream(MediaStream stream) {
+    _remoteAudioReady
+        .then((_) {
+          _remoteAudio.srcObject = stream;
+          _remoteAudio.setVolume(1);
+        })
+        .catchError((Object error) {
+          _setEvent('Remote audio could not be attached');
+          notifyListeners();
+        });
+  }
+
+  void _clearRemoteAudio() {
+    _remoteAudioReady
+        .then((_) {
+          _remoteAudio.srcObject = null;
+        })
+        .catchError((Object _) {});
   }
 
   void _setEvent(String event) {
