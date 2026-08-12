@@ -89,6 +89,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   bool _trackedCallIncoming = false;
   String _trackedCallRemote = '';
   String _trackedCallAccountName = '';
+  String _trackedCallDiagnostic = '';
   DateTime? _trackedCallStartedAt;
 
   @override
@@ -254,7 +255,11 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         _trackedCallRemote = _voip.remoteIdentity;
         _trackedCallIncoming = _voip.activeCallDirection == Direction.incoming;
         _trackedCallAccountName = _selectedAccount?.name ?? '';
+        _trackedCallDiagnostic = '';
         _trackedCallEstablished = false;
+      }
+      if (_voip.lastCallDiagnostic.isNotEmpty) {
+        _trackedCallDiagnostic = _voip.lastCallDiagnostic;
       }
       if (_voip.hasEstablishedCall) {
         _trackedCallEstablished = true;
@@ -286,6 +291,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         startedAt: startedAt,
         durationSeconds: duration < 0 ? 0 : duration,
         accountName: _trackedCallAccountName,
+        diagnostic: _trackedCallDiagnostic,
       ),
     );
     if (_callHistory.length > 250) {
@@ -296,6 +302,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _trackedCallIncoming = false;
     _trackedCallRemote = '';
     _trackedCallAccountName = '';
+    _trackedCallDiagnostic = '';
     _trackedCallStartedAt = null;
   }
 
@@ -2405,7 +2412,9 @@ class CallHistoryTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}',
+          entry.diagnostic.isEmpty
+              ? '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}'
+              : '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)} · ${entry.diagnostic}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

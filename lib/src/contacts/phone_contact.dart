@@ -46,6 +46,7 @@ class PhoneCallHistoryEntry {
     required this.startedAt,
     required this.durationSeconds,
     this.accountName = '',
+    this.diagnostic = '',
   });
 
   final String id;
@@ -55,6 +56,7 @@ class PhoneCallHistoryEntry {
   final DateTime startedAt;
   final int durationSeconds;
   final String accountName;
+  final String diagnostic;
 
   factory PhoneCallHistoryEntry.fromJson(Map<String, dynamic> json) {
     return PhoneCallHistoryEntry(
@@ -73,6 +75,7 @@ class PhoneCallHistoryEntry {
           DateTime.fromMillisecondsSinceEpoch(0),
       durationSeconds: json['durationSeconds'] as int? ?? 0,
       accountName: json['accountName'] as String? ?? '',
+      diagnostic: json['diagnostic'] as String? ?? '',
     );
   }
 
@@ -85,6 +88,7 @@ class PhoneCallHistoryEntry {
       'startedAt': startedAt.toIso8601String(),
       'durationSeconds': durationSeconds,
       'accountName': accountName,
+      'diagnostic': diagnostic,
     };
   }
 }

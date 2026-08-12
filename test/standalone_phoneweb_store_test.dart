@@ -52,6 +52,7 @@ void main() {
         startedAt: DateTime.utc(2026, 8, 12, 14, 0),
         durationSeconds: 42,
         accountName: 'Conta Softswitch',
+        diagnostic: 'SIP 486 · Busy Here',
       );
 
       await store.saveAccounts([account], selectedAccountId: account.id);
@@ -68,6 +69,7 @@ void main() {
       expect(loaded.contacts.single.id, contact.id);
       expect(loaded.callHistory, hasLength(1));
       expect(loaded.callHistory.single.durationSeconds, 42);
+      expect(loaded.callHistory.single.diagnostic, 'SIP 486 · Busy Here');
     },
   );
 }
