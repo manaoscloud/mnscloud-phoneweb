@@ -30,6 +30,7 @@ class PhoneWebVoipController extends ChangeNotifier
   TransportStateEnum _transportState = TransportStateEnum.NONE;
   CallStateEnum _callState = CallStateEnum.NONE;
   String _lastEvent = 'Ready';
+  String _lastCallDiagnostic = '';
   bool _muted = false;
   bool _onHold = false;
   bool _started = false;
@@ -41,6 +42,7 @@ class PhoneWebVoipController extends ChangeNotifier
   TransportStateEnum get transportState => _transportState;
   CallStateEnum get callState => _callState;
   String get lastEvent => _lastEvent;
+  String get lastCallDiagnostic => _lastCallDiagnostic;
   bool get muted => _muted;
   bool get onHold => _onHold;
   Duration get callDuration => _callDuration;
@@ -157,21 +159,32 @@ class PhoneWebVoipController extends ChangeNotifier
 
   Future<void> makeCall(String destination) async {
     final currentAccount = _account;
-    if (currentAccount == null || !_helper.connected) {
+    if (currentAccount == null || !_helper.connected || !_helper.registered) {
+      _lastCallDiagnostic =
+          'Account is not registered or the WebSocket transport is not connected.';
       _setEvent('Register an account before placing calls');
       notifyListeners();
       return;
     }
 
     final target = _normalizeTarget(destination, currentAccount.domain);
-    final stream = await _microphoneStream();
-    final started = await _helper.call(
-      target,
-      voiceOnly: true,
-      customOptions: _callOptions(currentAccount),
-      mediaStream: stream,
-    );
-    _setEvent(started ? 'Calling $target' : 'Call could not be started');
+    try {
+      _lastCallDiagnostic = '';
+      final stream = await _microphoneStream();
+      final started = await _helper.call(
+        target,
+        voiceOnly: true,
+        customOptions: _callOptions(currentAccount),
+        mediaStream: stream,
+      );
+      if (!started) {
+        _lastCallDiagnostic = 'The SIP/WebRTC stack did not start the call.';
+      }
+      _setEvent(started ? 'Calling $target' : 'Call could not be started');
+    } catch (error) {
+      _lastCallDiagnostic = 'Could not access microphone or start call: $error';
+      _setEvent('Call could not be started');
+    }
     notifyListeners();
   }
 
@@ -336,6 +349,10 @@ class PhoneWebVoipController extends ChangeNotifier
     }
 
     _callState = state.state;
+    final stateDiagnostic = _callDiagnosticFromState(state);
+    if (stateDiagnostic.isNotEmpty) {
+      _lastCallDiagnostic = stateDiagnostic;
+    }
 
     switch (state.state) {
       case CallStateEnum.NONE:
@@ -356,19 +373,25 @@ class PhoneWebVoipController extends ChangeNotifier
         _activeCall = call;
         _onHold = false;
       case CallStateEnum.CALL_INITIATION:
+      case CallStateEnum.CONNECTING:
+        _activeCall = call;
       case CallStateEnum.PROGRESS:
         _activeCall = call;
         if (call.direction == Direction.incoming) {
           _startRingtone();
+        } else {
+          _startRingback();
         }
       case CallStateEnum.ACCEPTED:
       case CallStateEnum.CONFIRMED:
         _activeCall = call;
         _stopRingtone();
+        _stopRingback();
         _startCallDuration();
       case CallStateEnum.STREAM:
         _activeCall = call;
         _stopRingtone();
+        _stopRingback();
         _startCallDuration();
         if (state.stream != null && state.originator == Originator.remote) {
           _attachRemoteStream(state.stream!);
@@ -588,6 +611,7 @@ class PhoneWebVoipController extends ChangeNotifier
 
   void _clearActiveCall(CallStateEnum state) {
     _stopRingtone();
+    _stopRingback();
     _stopCallDuration();
     _clearRemoteAudio();
     _activeCall = null;
@@ -622,6 +646,14 @@ class PhoneWebVoipController extends ChangeNotifier
     _ringtone.stop();
   }
 
+  void _startRingback() {
+    _ringtone.start();
+  }
+
+  void _stopRingback() {
+    _ringtone.stop();
+  }
+
   void _attachRemoteStream(MediaStream stream) {
     _remoteAudioReady
         .then((_) {
@@ -644,5 +676,18 @@ class PhoneWebVoipController extends ChangeNotifier
 
   void _setEvent(String event) {
     _lastEvent = event;
+  }
+
+  String _callDiagnosticFromState(CallState state) {
+    final cause = state.cause;
+    final parts = <String>[
+      if (cause?.status_code != null) 'SIP ${cause!.status_code}',
+      if (cause?.reason_phrase != null &&
+          cause!.reason_phrase!.trim().isNotEmpty)
+        cause.reason_phrase!.trim(),
+      if (cause?.cause != null && cause!.cause!.trim().isNotEmpty)
+        cause.cause!.trim(),
+    ];
+    return parts.join(' · ');
   }
 }
