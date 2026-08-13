@@ -506,6 +506,8 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                                     contactsStatus: _contactsStatus,
                                     onAddContact: () => _openContactDialog(),
                                     onSyncContacts: _syncNativeContacts,
+                                    onEditContact: (contact) =>
+                                        _openContactDialog(contact: contact),
                                     onDialContact: _dialContact,
                                   ),
                                 ),
@@ -559,6 +561,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         contactsStatus: _contactsStatus,
         onAddContact: () => _openContactDialog(),
         onSyncContacts: _syncNativeContacts,
+        onEditContact: (contact) => _openContactDialog(contact: contact),
         onDialContact: _dialContact,
       ),
       const SizedBox(height: 16),
@@ -2576,6 +2579,7 @@ class ContactsSummaryPanel extends StatelessWidget {
     required this.contactsStatus,
     required this.onAddContact,
     required this.onSyncContacts,
+    required this.onEditContact,
     required this.onDialContact,
     super.key,
   });
@@ -2585,6 +2589,7 @@ class ContactsSummaryPanel extends StatelessWidget {
   final String contactsStatus;
   final VoidCallback onAddContact;
   final VoidCallback onSyncContacts;
+  final ValueChanged<PhoneContact> onEditContact;
   final ValueChanged<PhoneContact> onDialContact;
 
   @override
@@ -2663,9 +2668,20 @@ class ContactsSummaryPanel extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  trailing: IconButton(
-                    onPressed: () => onDialContact(contact),
-                    icon: const Icon(Icons.call_outlined),
+                  trailing: Wrap(
+                    spacing: 2,
+                    children: [
+                      IconButton(
+                        onPressed: () => onEditContact(contact),
+                        tooltip: 'Edit contact',
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        onPressed: () => onDialContact(contact),
+                        tooltip: 'Call contact',
+                        icon: const Icon(Icons.call_outlined),
+                      ),
+                    ],
                   ),
                 ),
               ),
