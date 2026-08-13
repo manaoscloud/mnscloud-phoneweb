@@ -637,7 +637,7 @@ class WorkspacePanels extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const SizedBox(
+                    SizedBox(
                       height: _desktopSideFooterHeight,
                       child: MessagesPanel(),
                     ),
@@ -662,7 +662,7 @@ class WorkspacePanels extends StatelessWidget {
             const SizedBox(height: 16),
             CallHistoryPanel(entries: callHistory, onDial: onDialHistoryEntry),
             const SizedBox(height: 16),
-            const MessagesPanel(),
+            MessagesPanel(),
           ],
         );
       },
@@ -753,7 +753,7 @@ class MobilePhoneShell extends StatelessWidget {
         contactsStatus: contactsStatus,
       ),
       MobileHistoryView(entries: callHistory, onDial: onDialHistoryEntry),
-      const MobileMessagesView(),
+      MobileMessagesView(),
     ];
 
     return Scaffold(
@@ -1734,8 +1734,8 @@ class MobileMessagesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(18, 18, 18, 24),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
       child: MessagesPanel(),
     );
   }
@@ -2785,21 +2785,48 @@ class CallHistoryTile extends StatelessWidget {
   }
 }
 
-class MessagesPanel extends StatelessWidget {
+class MessagesPanel extends StatefulWidget {
   const MessagesPanel({super.key});
 
   @override
+  State<MessagesPanel> createState() => _MessagesPanelState();
+}
+
+class _MessagesPanelState extends State<MessagesPanel> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const SectionCard(
+    final query = _searchController.text.trim();
+
+    return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PanelTitle(icon: Icons.chat_bubble_outline, title: 'Mensagens'),
-          SizedBox(height: 12),
+          const PanelTitle(icon: Icons.chat_bubble_outline, title: 'Mensagens'),
+          const SizedBox(height: 12),
+          SearchBox(
+            controller: _searchController,
+            hintText: 'Pesquisar mensagens',
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
           EmptyState(
-            icon: Icons.chat_bubble_outline,
-            title: 'Mensagens',
-            message: 'Correio de voz e mensagens ficarão disponíveis aqui.',
+            icon: query.isEmpty
+                ? Icons.chat_bubble_outline
+                : Icons.search_off_outlined,
+            title: query.isEmpty
+                ? 'Nenhuma mensagem ainda'
+                : 'Nenhuma mensagem encontrada',
+            message: query.isEmpty
+                ? 'Correio de voz e mensagens ficarão disponíveis aqui.'
+                : 'Quando mensagens forem sincronizadas, a busca localizará por contato, número, assunto e conteúdo.',
           ),
         ],
       ),
