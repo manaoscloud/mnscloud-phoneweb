@@ -821,99 +821,181 @@ class MobilePhoneShell extends StatelessWidget {
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Accounts',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        onAddAccount();
-                      },
-                      icon: const Icon(Icons.add),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (accounts.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 28),
-                    child: Center(child: Text('No WebRTC accounts')),
-                  )
-                else
-                  ...accounts.map(
-                    (account) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(account.name),
-                      subtitle: Text(
-                        account.diagnostic == null
-                            ? '${account.username}@${account.domain}'
-                            : '${account.username}@${account.domain}\n${account.diagnostic!.summary}',
-                      ),
-                      isThreeLine: account.diagnostic != null,
-                      leading: Icon(
-                        selectedAccount?.id == account.id
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                      ),
-                      trailing: Wrap(
-                        children: [
-                          IconButton(
-                            onPressed: () => onToggleRegistration(account),
-                            tooltip:
-                                account.status == RegistrationStatus.registered
-                                ? 'Disconnect account'
-                                : 'Register account',
-                            icon: Icon(
-                              account.status == RegistrationStatus.registered
-                                  ? Icons.logout
-                                  : Icons.login,
-                            ),
-                          ),
-                          if (account.diagnostic != null)
-                            IconButton(
-                              onPressed: () =>
-                                  _showRegistrationDiagnosticDialog(
-                                    context,
-                                    account,
-                                  ),
-                              tooltip: 'Registration details',
-                              icon: const Icon(Icons.info_outline),
-                            ),
-                          IconButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              onEditAccount(account);
-                            },
-                            tooltip: 'Edit account',
-                            icon: const Icon(Icons.edit_outlined),
-                          ),
-                        ],
-                      ),
-                      onTap: () {
-                        onSelectAccount(account);
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        return AccountsBottomSheet(
+          accounts: accounts,
+          selectedAccount: selectedAccount,
+          onAddAccount: () {
+            Navigator.pop(context);
+            onAddAccount();
+          },
+          onEditAccount: (account) {
+            Navigator.pop(context);
+            onEditAccount(account);
+          },
+          onSelectAccount: (account) {
+            onSelectAccount(account);
+            Navigator.pop(context);
+          },
+          onToggleRegistration: onToggleRegistration,
         );
       },
+    );
+  }
+}
+
+class AccountsBottomSheet extends StatefulWidget {
+  const AccountsBottomSheet({
+    required this.accounts,
+    required this.selectedAccount,
+    required this.onAddAccount,
+    required this.onEditAccount,
+    required this.onSelectAccount,
+    required this.onToggleRegistration,
+    super.key,
+  });
+
+  final List<WebRtcAccount> accounts;
+  final WebRtcAccount? selectedAccount;
+  final VoidCallback onAddAccount;
+  final ValueChanged<WebRtcAccount> onEditAccount;
+  final ValueChanged<WebRtcAccount> onSelectAccount;
+  final ValueChanged<WebRtcAccount> onToggleRegistration;
+
+  @override
+  State<AccountsBottomSheet> createState() => _AccountsBottomSheetState();
+}
+
+class _AccountsBottomSheetState extends State<AccountsBottomSheet> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredAccounts = widget.accounts
+        .where((account) => _matchesAccount(account, _searchController.text))
+        .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          18,
+          0,
+          18,
+          18 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Accounts',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: widget.onAddAccount,
+                    tooltip: 'Add account',
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SearchBox(
+                controller: _searchController,
+                hintText: 'Search accounts',
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              if (widget.accounts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 28),
+                  child: Center(child: Text('No WebRTC accounts')),
+                )
+              else if (filteredAccounts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 28),
+                  child: Center(child: Text('No accounts match your search.')),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: filteredAccounts
+                        .map(
+                          (account) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(account.name),
+                            subtitle: Text(
+                              account.diagnostic == null
+                                  ? '${account.username}@${account.domain}'
+                                  : '${account.username}@${account.domain}\n${account.diagnostic!.summary}',
+                            ),
+                            isThreeLine: account.diagnostic != null,
+                            leading: Icon(
+                              widget.selectedAccount?.id == account.id
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
+                            ),
+                            trailing: Wrap(
+                              children: [
+                                IconButton(
+                                  onPressed: () =>
+                                      widget.onToggleRegistration(account),
+                                  tooltip:
+                                      account.status ==
+                                          RegistrationStatus.registered
+                                      ? 'Disconnect account'
+                                      : 'Register account',
+                                  icon: Icon(
+                                    account.status ==
+                                            RegistrationStatus.registered
+                                        ? Icons.logout
+                                        : Icons.login,
+                                  ),
+                                ),
+                                if (account.diagnostic != null)
+                                  IconButton(
+                                    onPressed: () =>
+                                        _showRegistrationDiagnosticDialog(
+                                          context,
+                                          account,
+                                        ),
+                                    tooltip: 'Registration details',
+                                    icon: const Icon(Icons.info_outline),
+                                  ),
+                                IconButton(
+                                  onPressed: () =>
+                                      widget.onEditAccount(account),
+                                  tooltip: 'Edit account',
+                                  icon: const Icon(Icons.edit_outlined),
+                                ),
+                              ],
+                            ),
+                            onTap: () => widget.onSelectAccount(account),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1384,7 +1466,7 @@ class MobileUtilityButton extends StatelessWidget {
   }
 }
 
-class MobileContactsView extends StatelessWidget {
+class MobileContactsView extends StatefulWidget {
   const MobileContactsView({
     required this.contacts,
     required this.onAddContact,
@@ -1405,8 +1487,25 @@ class MobileContactsView extends StatelessWidget {
   final String contactsStatus;
 
   @override
+  State<MobileContactsView> createState() => _MobileContactsViewState();
+}
+
+class _MobileContactsViewState extends State<MobileContactsView> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final filteredContacts = widget.contacts
+        .where((contact) => _matchesContact(contact, _searchController.text))
+        .toList();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
       child: Column(
@@ -1421,9 +1520,11 @@ class MobileContactsView extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
-                onPressed: contactsSyncing ? null : onSyncContacts,
+                onPressed: widget.contactsSyncing
+                    ? null
+                    : widget.onSyncContacts,
                 tooltip: 'Sincronizar agenda do dispositivo',
-                icon: contactsSyncing
+                icon: widget.contactsSyncing
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -1432,29 +1533,22 @@ class MobileContactsView extends StatelessWidget {
                     : const Icon(Icons.sync_outlined),
               ),
               IconButton(
-                onPressed: onAddContact,
+                onPressed: widget.onAddContact,
                 icon: const Icon(Icons.person_add_alt_1_outlined),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Buscar contato',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
-              ),
-            ),
+          SearchBox(
+            controller: _searchController,
+            hintText: 'Buscar contato',
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              contactsStatus,
+              widget.contactsStatus,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1464,7 +1558,7 @@ class MobileContactsView extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Expanded(
-            child: contacts.isEmpty
+            child: widget.contacts.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -1478,13 +1572,15 @@ class MobileContactsView extends StatelessWidget {
                         const Text('Nenhum contato'),
                         const SizedBox(height: 4),
                         Text(
-                          'Adicione contatos para discar mais rapido.',
+                          'Adicione contatos para discar mais rápido.',
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 18),
                         FilledButton.icon(
-                          onPressed: contactsSyncing ? null : onSyncContacts,
-                          icon: contactsSyncing
+                          onPressed: widget.contactsSyncing
+                              ? null
+                              : widget.onSyncContacts,
+                          icon: widget.contactsSyncing
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
@@ -1497,19 +1593,25 @@ class MobileContactsView extends StatelessWidget {
                         ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
-                          onPressed: onAddContact,
+                          onPressed: widget.onAddContact,
                           icon: const Icon(Icons.add),
                           label: const Text('Adicionar contato'),
                         ),
                       ],
                     ),
                   )
+                : filteredContacts.isEmpty
+                ? const MobileEmptyTab(
+                    icon: Icons.search_off_outlined,
+                    title: 'Nenhum contato encontrado',
+                    message: 'Tente buscar por nome, empresa ou número.',
+                  )
                 : ListView.separated(
-                    itemCount: contacts.length,
+                    itemCount: filteredContacts.length,
                     separatorBuilder: (context, index) =>
                         Divider(color: colorScheme.outlineVariant),
                     itemBuilder: (context, index) {
-                      final contact = contacts[index];
+                      final contact = filteredContacts[index];
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
@@ -1535,11 +1637,11 @@ class MobileContactsView extends StatelessWidget {
                                 child: Icon(Icons.contacts_outlined, size: 20),
                               ),
                             IconButton(
-                              onPressed: () => onEditContact(contact),
+                              onPressed: () => widget.onEditContact(contact),
                               icon: const Icon(Icons.edit_outlined),
                             ),
                             IconButton(
-                              onPressed: () => onDialContact(contact),
+                              onPressed: () => widget.onDialContact(contact),
                               icon: const Icon(Icons.call_outlined),
                             ),
                           ],
@@ -1554,7 +1656,7 @@ class MobileContactsView extends StatelessWidget {
   }
 }
 
-class MobileHistoryView extends StatelessWidget {
+class MobileHistoryView extends StatefulWidget {
   const MobileHistoryView({
     required this.entries,
     required this.onDial,
@@ -1565,23 +1667,64 @@ class MobileHistoryView extends StatelessWidget {
   final ValueChanged<PhoneCallHistoryEntry> onDial;
 
   @override
-  Widget build(BuildContext context) {
-    if (entries.isEmpty) {
-      return const MobileEmptyTab(
-        icon: Icons.history,
-        title: 'Histórico vazio',
-        message: 'As chamadas realizadas e recebidas aparecerão aqui.',
-      );
-    }
+  State<MobileHistoryView> createState() => _MobileHistoryViewState();
+}
 
-    return ListView.separated(
+class _MobileHistoryViewState extends State<MobileHistoryView> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filteredEntries = widget.entries
+        .where(
+          (entry) => _matchesCallHistoryEntry(entry, _searchController.text),
+        )
+        .toList();
+
+    return Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-      itemCount: entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        return CallHistoryTile(entry: entry, onDial: () => onDial(entry));
-      },
+      child: Column(
+        children: [
+          SearchBox(
+            controller: _searchController,
+            hintText: 'Buscar histórico',
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: widget.entries.isEmpty
+                ? const MobileEmptyTab(
+                    icon: Icons.history,
+                    title: 'Histórico vazio',
+                    message:
+                        'As chamadas realizadas e recebidas aparecerão aqui.',
+                  )
+                : filteredEntries.isEmpty
+                ? const MobileEmptyTab(
+                    icon: Icons.search_off_outlined,
+                    title: 'Nenhuma chamada encontrada',
+                    message: 'Tente buscar por número, conta, status ou SIP.',
+                  )
+                : ListView.separated(
+                    itemCount: filteredEntries.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final entry = filteredEntries[index];
+                      return CallHistoryTile(
+                        entry: entry,
+                        onDial: () => widget.onDial(entry),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1790,7 +1933,7 @@ class VersionBadge extends StatelessWidget {
   }
 }
 
-class AccountPanel extends StatelessWidget {
+class AccountPanel extends StatefulWidget {
   const AccountPanel({
     required this.accounts,
     required this.selectedAccountId,
@@ -1811,7 +1954,24 @@ class AccountPanel extends StatelessWidget {
   final ValueChanged<WebRtcAccount> onToggleRegistration;
 
   @override
+  State<AccountPanel> createState() => _AccountPanelState();
+}
+
+class _AccountPanelState extends State<AccountPanel> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filteredAccounts = widget.accounts
+        .where((account) => _matchesAccount(account, _searchController.text))
+        .toList();
+
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1821,34 +1981,95 @@ class AccountPanel extends StatelessWidget {
             title: 'Accounts',
             action: IconButton(
               tooltip: 'Add account',
-              onPressed: onAddAccount,
+              onPressed: widget.onAddAccount,
               icon: const Icon(Icons.add),
             ),
           ),
           const SizedBox(height: 12),
-          if (accounts.isEmpty)
+          SearchBox(
+            controller: _searchController,
+            hintText: 'Search accounts',
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          if (widget.accounts.isEmpty)
             EmptyState(
               icon: Icons.wifi_calling_3_outlined,
               title: 'No WebRTC accounts',
               message: 'Add a WSS provider account to start configuring calls.',
               actionLabel: 'Add account',
-              onAction: onAddAccount,
+              onAction: widget.onAddAccount,
+            )
+          else if (filteredAccounts.isEmpty)
+            const EmptyState(
+              icon: Icons.search_off_outlined,
+              title: 'No accounts found',
+              message:
+                  'Search by account name, SIP user, domain, WSS or status.',
             )
           else
-            ...accounts.map(
+            ...filteredAccounts.map(
               (account) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: AccountTile(
                   account: account,
-                  selected: selectedAccountId == account.id,
-                  onSelect: () => onSelectAccount(account),
-                  onEdit: () => onEditAccount(account),
-                  onRemove: () => onRemoveAccount(account),
-                  onToggle: () => onToggleRegistration(account),
+                  selected: widget.selectedAccountId == account.id,
+                  onSelect: () => widget.onSelectAccount(account),
+                  onEdit: () => widget.onEditAccount(account),
+                  onRemove: () => widget.onRemoveAccount(account),
+                  onToggle: () => widget.onToggleRegistration(account),
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class SearchBox extends StatelessWidget {
+  const SearchBox({
+    required this.controller,
+    required this.hintText,
+    required this.onChanged,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                tooltip: 'Clear search',
+                onPressed: () {
+                  controller.clear();
+                  onChanged('');
+                },
+                icon: const Icon(Icons.close),
+              ),
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        isDense: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
       ),
     );
   }
@@ -2379,38 +2600,80 @@ class ActiveCallControls extends StatelessWidget {
   }
 }
 
-class CallHistoryPanel extends StatelessWidget {
+class CallHistoryPanel extends StatefulWidget {
   const CallHistoryPanel({required this.entries, this.onDial, super.key});
 
   final List<PhoneCallHistoryEntry> entries;
   final ValueChanged<PhoneCallHistoryEntry>? onDial;
 
   @override
+  State<CallHistoryPanel> createState() => _CallHistoryPanelState();
+}
+
+class _CallHistoryPanelState extends State<CallHistoryPanel> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filteredEntries = widget.entries
+        .where(
+          (entry) => _matchesCallHistoryEntry(entry, _searchController.text),
+        )
+        .toList();
+    final previewEntries = filteredEntries.take(8).toList();
+
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PanelTitle(icon: Icons.history, title: 'Call history'),
           const SizedBox(height: 12),
-          if (entries.isEmpty)
+          SearchBox(
+            controller: _searchController,
+            hintText: 'Search call history',
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          if (widget.entries.isEmpty)
             const EmptyState(
               icon: Icons.call_outlined,
               title: 'No calls yet',
               message: 'Completed calls will appear here.',
             )
+          else if (previewEntries.isEmpty)
+            const EmptyState(
+              icon: Icons.search_off_outlined,
+              title: 'No calls found',
+              message: 'Search by number, account, status or SIP diagnostic.',
+            )
           else
-            ...entries
-                .take(8)
-                .map(
-                  (entry) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: CallHistoryTile(
-                      entry: entry,
-                      onDial: onDial == null ? null : () => onDial!(entry),
-                    ),
-                  ),
+            ...previewEntries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: CallHistoryTile(
+                  entry: entry,
+                  onDial: widget.onDial == null
+                      ? null
+                      : () => widget.onDial!(entry),
                 ),
+              ),
+            ),
+          if (filteredEntries.length > previewEntries.length)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '${filteredEntries.length - previewEntries.length} more matching call(s).',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -2572,7 +2835,76 @@ String _dialableHistoryIdentity(String value) {
   return trimmed.split('@').first;
 }
 
-class ContactsSummaryPanel extends StatelessWidget {
+bool _matchesAccount(WebRtcAccount account, String query) {
+  final normalizedQuery = _normalizeSearchText(query);
+  if (normalizedQuery.isEmpty) return true;
+
+  return _searchableText([
+    account.name,
+    account.displayName,
+    account.username,
+    account.domain,
+    account.wssServer,
+    account.stunServer,
+    account.turnServer,
+    account.status.label,
+    account.diagnostic?.summary,
+    account.diagnostic?.detail,
+    account.diagnostic?.code,
+    account.diagnostic?.reasonPhrase,
+  ]).contains(normalizedQuery);
+}
+
+bool _matchesContact(PhoneContact contact, String query) {
+  final normalizedQuery = _normalizeSearchText(query);
+  if (normalizedQuery.isEmpty) return true;
+
+  return _searchableText([
+    contact.name,
+    contact.number,
+    contact.company,
+    contact.source.name,
+  ]).contains(normalizedQuery);
+}
+
+bool _matchesCallHistoryEntry(PhoneCallHistoryEntry entry, String query) {
+  final normalizedQuery = _normalizeSearchText(query);
+  if (normalizedQuery.isEmpty) return true;
+
+  final statusLabel = switch (entry.status) {
+    PhoneCallStatus.completed => 'Completed',
+    PhoneCallStatus.missed => 'Missed',
+    PhoneCallStatus.failed => 'Failed',
+  };
+  final directionLabel = switch (entry.direction) {
+    PhoneCallDirection.incoming => 'Incoming',
+    PhoneCallDirection.outgoing => 'Outgoing',
+  };
+
+  return _searchableText([
+    entry.remoteIdentity,
+    _dialableHistoryIdentity(entry.remoteIdentity),
+    entry.accountName,
+    entry.diagnostic,
+    statusLabel,
+    directionLabel,
+    _formatShortTime(entry.startedAt),
+  ]).contains(normalizedQuery);
+}
+
+String _searchableText(Iterable<String?> values) {
+  return values
+      .whereType<String>()
+      .map(_normalizeSearchText)
+      .where((value) => value.isNotEmpty)
+      .join(' ');
+}
+
+String _normalizeSearchText(String value) {
+  return value.trim().toLowerCase();
+}
+
+class ContactsSummaryPanel extends StatefulWidget {
   const ContactsSummaryPanel({
     required this.contacts,
     required this.contactsSyncing,
@@ -2593,9 +2925,25 @@ class ContactsSummaryPanel extends StatelessWidget {
   final ValueChanged<PhoneContact> onDialContact;
 
   @override
+  State<ContactsSummaryPanel> createState() => _ContactsSummaryPanelState();
+}
+
+class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final previewContacts = contacts.take(4).toList();
+    final filteredContacts = widget.contacts
+        .where((contact) => _matchesContact(contact, _searchController.text))
+        .toList();
+    final previewContacts = filteredContacts.take(4).toList();
 
     return SectionCard(
       child: SingleChildScrollView(
@@ -2612,9 +2960,11 @@ class ContactsSummaryPanel extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: contactsSyncing ? null : onSyncContacts,
+                  onPressed: widget.contactsSyncing
+                      ? null
+                      : widget.onSyncContacts,
                   tooltip: 'Sync device contacts',
-                  icon: contactsSyncing
+                  icon: widget.contactsSyncing
                       ? const SizedBox(
                           width: 18,
                           height: 18,
@@ -2623,15 +2973,21 @@ class ContactsSummaryPanel extends StatelessWidget {
                       : const Icon(Icons.sync_outlined),
                 ),
                 IconButton(
-                  onPressed: onAddContact,
+                  onPressed: widget.onAddContact,
                   tooltip: 'Add contact',
                   icon: const Icon(Icons.add),
                 ),
               ],
             ),
             const SizedBox(height: 8),
+            SearchBox(
+              controller: _searchController,
+              hintText: 'Search contacts',
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
             Text(
-              contactsStatus,
+              widget.contactsStatus,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -2639,13 +2995,19 @@ class ContactsSummaryPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            if (previewContacts.isEmpty)
+            if (widget.contacts.isEmpty)
               EmptyState(
                 icon: Icons.contacts_outlined,
                 title: 'No contacts yet',
                 message: 'Sync the device address book or add a local contact.',
                 actionLabel: 'Sync contacts',
-                onAction: contactsSyncing ? null : onSyncContacts,
+                onAction: widget.contactsSyncing ? null : widget.onSyncContacts,
+              )
+            else if (previewContacts.isEmpty)
+              const EmptyState(
+                icon: Icons.search_off_outlined,
+                title: 'No contacts found',
+                message: 'Search by name, company or number.',
               )
             else
               ...previewContacts.map(
@@ -2672,16 +3034,26 @@ class ContactsSummaryPanel extends StatelessWidget {
                     spacing: 2,
                     children: [
                       IconButton(
-                        onPressed: () => onEditContact(contact),
+                        onPressed: () => widget.onEditContact(contact),
                         tooltip: 'Edit contact',
                         icon: const Icon(Icons.edit_outlined),
                       ),
                       IconButton(
-                        onPressed: () => onDialContact(contact),
+                        onPressed: () => widget.onDialContact(contact),
                         tooltip: 'Call contact',
                         icon: const Icon(Icons.call_outlined),
                       ),
                     ],
+                  ),
+                ),
+              ),
+            if (filteredContacts.length > previewContacts.length)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${filteredContacts.length - previewContacts.length} more matching contact(s).',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
