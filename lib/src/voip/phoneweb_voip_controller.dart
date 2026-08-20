@@ -192,12 +192,17 @@ class PhoneWebVoipController extends ChangeNotifier
     final call = _activeCall;
     if (call == null) return;
 
-    final stream = await _microphoneStream();
-    _setEvent('Answering call');
-    notifyListeners();
-    call.answer(_callOptions(_account), mediaStream: stream);
-    _startCallDuration();
-    _setEvent('Call answer requested');
+    try {
+      final stream = await _microphoneStream();
+      _setEvent('Answering call');
+      notifyListeners();
+      call.answer(_callOptions(_account), mediaStream: stream);
+      _setEvent('Call answer requested');
+    } catch (error) {
+      _lastCallDiagnostic = 'Could not access microphone or answer call: $error';
+      _setEvent('Call answer failed');
+      _clearActiveCall(CallStateEnum.FAILED);
+    }
     notifyListeners();
   }
 
