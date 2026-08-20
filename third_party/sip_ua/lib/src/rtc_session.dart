@@ -721,6 +721,14 @@ class RTCSession extends EventManager implements Owner {
       }
       logger.e('Failed to answer(): ${error.toString()}',
           error: error, stackTrace: s);
+      _failed(
+          Originator.system,
+          null,
+          request is IncomingRequest ? request : null,
+          null,
+          500,
+          DartSIP_C.CausesType.WEBRTC_ERROR,
+          'Answer failed: ${error.toString()}');
     }
   }
 
