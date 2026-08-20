@@ -662,15 +662,10 @@ class RTCSession extends EventManager implements Owner {
     try {
       await _connection!.setRemoteDescription(offer);
     } catch (error) {
-      request.reply(488);
-      _failed(
-          Originator.system,
-          null,
-          null,
-          null,
-          488,
-          DartSIP_C.CausesType.WEBRTC_ERROR,
-          'SetRemoteDescription(offer) failed');
+      final reason = 'SetRemoteDescription failed: ${error.toString()}';
+      request.reply(488, reason);
+      _failed(Originator.system, null, null, null, 488,
+          DartSIP_C.CausesType.WEBRTC_ERROR, reason);
       logger.e(
           'emit "peerconnection:setremotedescriptionfailed" [error:${error.toString()}]');
       emit(EventSetRemoteDescriptionFailed(exception: error));
@@ -695,7 +690,7 @@ class RTCSession extends EventManager implements Owner {
             await _createLocalDescription(SdpType.offer, _rtcOfferConstraints);
       }
     } catch (e) {
-      request.reply(500);
+      request.reply(500, 'CreateLocalDescription failed: ${e.toString()}');
       throw Exceptions.TypeError('_createLocalDescription() failed');
     }
 
