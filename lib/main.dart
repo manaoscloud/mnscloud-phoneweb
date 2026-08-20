@@ -2576,11 +2576,20 @@ class ActiveCallControls extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (voip.hasIncomingCall) ...[
+              if (voip.hasAnswerableIncomingCall) ...[
                 FilledButton.icon(
                   onPressed: voip.answer,
                   icon: const Icon(Icons.call),
                   label: const Text('Answer'),
+                ),
+              ] else if (voip.hasPendingAnsweredIncomingCall) ...[
+                FilledButton.tonalIcon(
+                  onPressed: null,
+                  icon: const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  label: const Text('Connecting'),
                 ),
               ] else ...[
                 FilledButton.tonalIcon(
@@ -2597,7 +2606,9 @@ class ActiveCallControls extends StatelessWidget {
               FilledButton.icon(
                 onPressed: voip.rejectOrHangup,
                 icon: const Icon(Icons.call_end),
-                label: Text(voip.hasIncomingCall ? 'Decline' : 'Hang up'),
+                label: Text(
+                  voip.hasAnswerableIncomingCall ? 'Decline' : 'Hang up',
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFB91C1C),
                 ),
