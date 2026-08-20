@@ -21,6 +21,7 @@ class PhoneWebVoipController extends ChangeNotifier
   late final Future<void> _remoteAudioReady;
   final Map<String, Timer> _terminatedCallGuards = <String, Timer>{};
   final Set<String> _confirmedCallIds = <String>{};
+  final Set<String> _answerRequestedCallIds = <String>{};
   Timer? _callDurationTimer;
   Timer? _answerConfirmationTimer;
   WebRtcAccount? _account;
@@ -67,6 +68,14 @@ class PhoneWebVoipController extends ChangeNotifier
       _callState != CallStateEnum.FAILED &&
       _callState != CallStateEnum.ENDED &&
       _callState != CallStateEnum.NONE;
+  bool get hasAnswerableIncomingCall =>
+      hasIncomingCall &&
+      !_isAnswerRequested(_activeCall) &&
+      (_callState == CallStateEnum.CALL_INITIATION ||
+          _callState == CallStateEnum.CONNECTING ||
+          _callState == CallStateEnum.PROGRESS);
+  bool get hasPendingAnsweredIncomingCall =>
+      hasIncomingCall && !hasAnswerableIncomingCall;
   String get remoteIdentity => _activeCall?.remote_identity ?? '';
   String get formattedCallDuration {
     final totalSeconds = _callDuration.inSeconds;
@@ -198,6 +207,8 @@ class PhoneWebVoipController extends ChangeNotifier
       final stream = await _microphoneStream();
       _setEvent('Answering call');
       notifyListeners();
+      _markAnswerRequested(call);
+      _stopRingtone();
       call.answer(_callOptions(_account), mediaStream: stream);
       _setEvent('Call answer requested');
       _startAnswerConfirmationTimer(call);
@@ -395,10 +406,12 @@ class PhoneWebVoipController extends ChangeNotifier
         }
       case CallStateEnum.ACCEPTED:
         _activeCall = call;
+        _markAnswerRequested(call);
         _stopRingtone();
         _stopRingback();
       case CallStateEnum.CONFIRMED:
         _activeCall = call;
+        _markAnswerRequested(call);
         _markCallConfirmed(call);
         _cancelAnswerConfirmationTimer();
         _stopRingtone();
@@ -406,13 +419,14 @@ class PhoneWebVoipController extends ChangeNotifier
         _startCallDuration();
       case CallStateEnum.STREAM:
         _activeCall = call;
-        if (state.stream != null &&
-            state.originator == Originator.remote &&
-            _isCallConfirmed(call)) {
+        _markAnswerRequested(call);
+        if (state.stream != null && state.originator == Originator.remote) {
           _stopRingtone();
           _stopRingback();
-          _startCallDuration();
           _attachRemoteStream(state.stream!);
+          if (_isCallConfirmed(call)) {
+            _startCallDuration();
+          }
         }
       default:
         _activeCall = call;
@@ -634,6 +648,7 @@ class PhoneWebVoipController extends ChangeNotifier
     _stopCallDuration();
     _clearRemoteAudio();
     _forgetCallConfirmed(_activeCall);
+    _forgetAnswerRequested(_activeCall);
     _activeCall = null;
     _callState = state;
     _muted = false;
@@ -692,6 +707,23 @@ class PhoneWebVoipController extends ChangeNotifier
   bool _isCallConfirmed(Call? call) {
     final id = call == null ? null : _callGuardId(call);
     return id != null && _confirmedCallIds.contains(id);
+  }
+
+  void _markAnswerRequested(Call call) {
+    final id = _callGuardId(call);
+    if (id == null) return;
+    _answerRequestedCallIds.add(id);
+  }
+
+  void _forgetAnswerRequested(Call? call) {
+    final id = call == null ? null : _callGuardId(call);
+    if (id == null) return;
+    _answerRequestedCallIds.remove(id);
+  }
+
+  bool _isAnswerRequested(Call? call) {
+    final id = call == null ? null : _callGuardId(call);
+    return id != null && _answerRequestedCallIds.contains(id);
   }
 
   void _startRingtone() {
