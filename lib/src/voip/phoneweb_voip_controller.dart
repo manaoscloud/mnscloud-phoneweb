@@ -199,7 +199,8 @@ class PhoneWebVoipController extends ChangeNotifier
       call.answer(_callOptions(_account), mediaStream: stream);
       _setEvent('Call answer requested');
     } catch (error) {
-      _lastCallDiagnostic = 'Could not access microphone or answer call: $error';
+      _lastCallDiagnostic =
+          'Could not access microphone or answer call: $error';
       _setEvent('Call answer failed');
       _clearActiveCall(CallStateEnum.FAILED);
     }
@@ -395,10 +396,10 @@ class PhoneWebVoipController extends ChangeNotifier
         _startCallDuration();
       case CallStateEnum.STREAM:
         _activeCall = call;
-        _stopRingtone();
-        _stopRingback();
-        _startCallDuration();
         if (state.stream != null && state.originator == Originator.remote) {
+          _stopRingtone();
+          _stopRingback();
+          _startCallDuration();
           _attachRemoteStream(state.stream!);
         }
       default:
