@@ -484,6 +484,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                                   child: AccountPanel(
                                     accounts: _accounts,
                                     selectedAccountId: _selectedAccount?.id,
+                                    useInternalScroll: true,
                                     onAddAccount: () => _openAccountDialog(),
                                     onEditAccount: (account) =>
                                         _openAccountDialog(account: account),
@@ -504,6 +505,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                                     contacts: _contacts,
                                     contactsSyncing: _contactsSyncing,
                                     contactsStatus: _contactsStatus,
+                                    useInternalScroll: true,
                                     onAddContact: () => _openContactDialog(),
                                     onSyncContacts: _syncNativeContacts,
                                     onEditContact: (contact) =>
@@ -634,12 +636,13 @@ class WorkspacePanels extends StatelessWidget {
                       child: CallHistoryPanel(
                         entries: callHistory,
                         onDial: onDialHistoryEntry,
+                        useInternalScroll: true,
                       ),
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
                       height: _desktopSideFooterHeight,
-                      child: MessagesPanel(),
+                      child: MessagesPanel(useInternalScroll: true),
                     ),
                   ],
                 ),
@@ -1942,11 +1945,13 @@ class AccountPanel extends StatefulWidget {
     required this.onRemoveAccount,
     required this.onSelectAccount,
     required this.onToggleRegistration,
+    this.useInternalScroll = false,
     super.key,
   });
 
   final List<WebRtcAccount> accounts;
   final String? selectedAccountId;
+  final bool useInternalScroll;
   final VoidCallback onAddAccount;
   final ValueChanged<WebRtcAccount> onEditAccount;
   final ValueChanged<WebRtcAccount> onRemoveAccount;
@@ -1971,6 +1976,36 @@ class _AccountPanelState extends State<AccountPanel> {
     final filteredAccounts = widget.accounts
         .where((account) => _matchesAccount(account, _searchController.text))
         .toList();
+    final bodyChildren = <Widget>[
+      if (widget.accounts.isEmpty)
+        EmptyState(
+          icon: Icons.wifi_calling_3_outlined,
+          title: 'No WebRTC accounts',
+          message: 'Add a WSS provider account to start configuring calls.',
+          actionLabel: 'Add account',
+          onAction: widget.onAddAccount,
+        )
+      else if (filteredAccounts.isEmpty)
+        const EmptyState(
+          icon: Icons.search_off_outlined,
+          title: 'No accounts found',
+          message: 'Search by account name, SIP user, domain, WSS or status.',
+        )
+      else
+        ...filteredAccounts.map(
+          (account) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AccountTile(
+              account: account,
+              selected: widget.selectedAccountId == account.id,
+              onSelect: () => widget.onSelectAccount(account),
+              onEdit: () => widget.onEditAccount(account),
+              onRemove: () => widget.onRemoveAccount(account),
+              onToggle: () => widget.onToggleRegistration(account),
+            ),
+          ),
+        ),
+    ];
 
     return SectionCard(
       child: Column(
@@ -1992,35 +2027,10 @@ class _AccountPanelState extends State<AccountPanel> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          if (widget.accounts.isEmpty)
-            EmptyState(
-              icon: Icons.wifi_calling_3_outlined,
-              title: 'No WebRTC accounts',
-              message: 'Add a WSS provider account to start configuring calls.',
-              actionLabel: 'Add account',
-              onAction: widget.onAddAccount,
-            )
-          else if (filteredAccounts.isEmpty)
-            const EmptyState(
-              icon: Icons.search_off_outlined,
-              title: 'No accounts found',
-              message:
-                  'Search by account name, SIP user, domain, WSS or status.',
-            )
-          else
-            ...filteredAccounts.map(
-              (account) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: AccountTile(
-                  account: account,
-                  selected: widget.selectedAccountId == account.id,
-                  onSelect: () => widget.onSelectAccount(account),
-                  onEdit: () => widget.onEditAccount(account),
-                  onRemove: () => widget.onRemoveAccount(account),
-                  onToggle: () => widget.onToggleRegistration(account),
-                ),
-              ),
-            ),
+          _PanelScrollableContent(
+            enabled: widget.useInternalScroll,
+            children: bodyChildren,
+          ),
         ],
       ),
     );
@@ -2601,10 +2611,16 @@ class ActiveCallControls extends StatelessWidget {
 }
 
 class CallHistoryPanel extends StatefulWidget {
-  const CallHistoryPanel({required this.entries, this.onDial, super.key});
+  const CallHistoryPanel({
+    required this.entries,
+    this.onDial,
+    this.useInternalScroll = false,
+    super.key,
+  });
 
   final List<PhoneCallHistoryEntry> entries;
   final ValueChanged<PhoneCallHistoryEntry>? onDial;
+  final bool useInternalScroll;
 
   @override
   State<CallHistoryPanel> createState() => _CallHistoryPanelState();
@@ -2626,7 +2642,32 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
           (entry) => _matchesCallHistoryEntry(entry, _searchController.text),
         )
         .toList();
-    final previewEntries = filteredEntries.take(8).toList();
+    final bodyChildren = <Widget>[
+      if (widget.entries.isEmpty)
+        const EmptyState(
+          icon: Icons.call_outlined,
+          title: 'No calls yet',
+          message: 'Completed calls will appear here.',
+        )
+      else if (filteredEntries.isEmpty)
+        const EmptyState(
+          icon: Icons.search_off_outlined,
+          title: 'No calls found',
+          message: 'Search by number, account, status or SIP diagnostic.',
+        )
+      else
+        ...filteredEntries.map(
+          (entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: CallHistoryTile(
+              entry: entry,
+              onDial: widget.onDial == null
+                  ? null
+                  : () => widget.onDial!(entry),
+            ),
+          ),
+        ),
+    ];
 
     return SectionCard(
       child: Column(
@@ -2640,40 +2681,10 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          if (widget.entries.isEmpty)
-            const EmptyState(
-              icon: Icons.call_outlined,
-              title: 'No calls yet',
-              message: 'Completed calls will appear here.',
-            )
-          else if (previewEntries.isEmpty)
-            const EmptyState(
-              icon: Icons.search_off_outlined,
-              title: 'No calls found',
-              message: 'Search by number, account, status or SIP diagnostic.',
-            )
-          else
-            ...previewEntries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: CallHistoryTile(
-                  entry: entry,
-                  onDial: widget.onDial == null
-                      ? null
-                      : () => widget.onDial!(entry),
-                ),
-              ),
-            ),
-          if (filteredEntries.length > previewEntries.length)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                '${filteredEntries.length - previewEntries.length} more matching call(s).',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+          _PanelScrollableContent(
+            enabled: widget.useInternalScroll,
+            children: bodyChildren,
+          ),
         ],
       ),
     );
@@ -2786,7 +2797,9 @@ class CallHistoryTile extends StatelessWidget {
 }
 
 class MessagesPanel extends StatefulWidget {
-  const MessagesPanel({super.key});
+  const MessagesPanel({this.useInternalScroll = false, super.key});
+
+  final bool useInternalScroll;
 
   @override
   State<MessagesPanel> createState() => _MessagesPanelState();
@@ -2817,16 +2830,21 @@ class _MessagesPanelState extends State<MessagesPanel> {
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
-          EmptyState(
-            icon: query.isEmpty
-                ? Icons.chat_bubble_outline
-                : Icons.search_off_outlined,
-            title: query.isEmpty
-                ? 'Nenhuma mensagem ainda'
-                : 'Nenhuma mensagem encontrada',
-            message: query.isEmpty
-                ? 'Correio de voz e mensagens ficarão disponíveis aqui.'
-                : 'Quando mensagens forem sincronizadas, a busca localizará por contato, número, assunto e conteúdo.',
+          _PanelScrollableContent(
+            enabled: widget.useInternalScroll,
+            children: [
+              EmptyState(
+                icon: query.isEmpty
+                    ? Icons.chat_bubble_outline
+                    : Icons.search_off_outlined,
+                title: query.isEmpty
+                    ? 'Nenhuma mensagem ainda'
+                    : 'Nenhuma mensagem encontrada',
+                message: query.isEmpty
+                    ? 'Correio de voz e mensagens ficarão disponíveis aqui.'
+                    : 'Quando mensagens forem sincronizadas, a busca localizará por contato, número, assunto e conteúdo.',
+              ),
+            ],
           ),
         ],
       ),
@@ -2940,6 +2958,7 @@ class ContactsSummaryPanel extends StatefulWidget {
     required this.onSyncContacts,
     required this.onEditContact,
     required this.onDialContact,
+    this.useInternalScroll = false,
     super.key,
   });
 
@@ -2950,6 +2969,7 @@ class ContactsSummaryPanel extends StatefulWidget {
   final VoidCallback onSyncContacts;
   final ValueChanged<PhoneContact> onEditContact;
   final ValueChanged<PhoneContact> onDialContact;
+  final bool useInternalScroll;
 
   @override
   State<ContactsSummaryPanel> createState() => _ContactsSummaryPanelState();
@@ -2970,121 +2990,144 @@ class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
     final filteredContacts = widget.contacts
         .where((contact) => _matchesContact(contact, _searchController.text))
         .toList();
-    final previewContacts = filteredContacts.take(4).toList();
-
-    return SectionCard(
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
+    final bodyChildren = <Widget>[
+      if (widget.contacts.isEmpty)
+        EmptyState(
+          icon: Icons.contacts_outlined,
+          title: 'No contacts yet',
+          message: 'Sync the device address book or add a local contact.',
+          actionLabel: 'Sync contacts',
+          onAction: widget.contactsSyncing ? null : widget.onSyncContacts,
+        )
+      else if (filteredContacts.isEmpty)
+        const EmptyState(
+          icon: Icons.search_off_outlined,
+          title: 'No contacts found',
+          message: 'Search by name, company or number.',
+        )
+      else
+        ...filteredContacts.map(
+          (contact) => ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              radius: 16,
+              backgroundColor: colorScheme.primaryContainer,
+              foregroundColor: colorScheme.onPrimaryContainer,
+              child: Text(contact.name.isEmpty ? '?' : contact.name[0]),
+            ),
+            title: Text(
+              contact.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              contact.number,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: Wrap(
+              spacing: 2,
               children: [
-                const Expanded(
-                  child: PanelTitle(
-                    icon: Icons.contacts_outlined,
-                    title: 'Contacts',
-                  ),
+                IconButton(
+                  onPressed: () => widget.onEditContact(contact),
+                  tooltip: 'Edit contact',
+                  icon: const Icon(Icons.edit_outlined),
                 ),
                 IconButton(
-                  onPressed: widget.contactsSyncing
-                      ? null
-                      : widget.onSyncContacts,
-                  tooltip: 'Sync device contacts',
-                  icon: widget.contactsSyncing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.sync_outlined),
-                ),
-                IconButton(
-                  onPressed: widget.onAddContact,
-                  tooltip: 'Add contact',
-                  icon: const Icon(Icons.add),
+                  onPressed: () => widget.onDialContact(contact),
+                  tooltip: 'Call contact',
+                  icon: const Icon(Icons.call_outlined),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            SearchBox(
-              controller: _searchController,
-              hintText: 'Search contacts',
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              widget.contactsStatus,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (widget.contacts.isEmpty)
-              EmptyState(
-                icon: Icons.contacts_outlined,
-                title: 'No contacts yet',
-                message: 'Sync the device address book or add a local contact.',
-                actionLabel: 'Sync contacts',
-                onAction: widget.contactsSyncing ? null : widget.onSyncContacts,
-              )
-            else if (previewContacts.isEmpty)
-              const EmptyState(
-                icon: Icons.search_off_outlined,
-                title: 'No contacts found',
-                message: 'Search by name, company or number.',
-              )
-            else
-              ...previewContacts.map(
-                (contact) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: colorScheme.primaryContainer,
-                    foregroundColor: colorScheme.onPrimaryContainer,
-                    child: Text(contact.name.isEmpty ? '?' : contact.name[0]),
-                  ),
-                  title: Text(
-                    contact.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    contact.number,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  trailing: Wrap(
-                    spacing: 2,
-                    children: [
-                      IconButton(
-                        onPressed: () => widget.onEditContact(contact),
-                        tooltip: 'Edit contact',
-                        icon: const Icon(Icons.edit_outlined),
-                      ),
-                      IconButton(
-                        onPressed: () => widget.onDialContact(contact),
-                        tooltip: 'Call contact',
-                        icon: const Icon(Icons.call_outlined),
-                      ),
-                    ],
-                  ),
+          ),
+        ),
+    ];
+
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: PanelTitle(
+                  icon: Icons.contacts_outlined,
+                  title: 'Contacts',
                 ),
               ),
-            if (filteredContacts.length > previewContacts.length)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  '${filteredContacts.length - previewContacts.length} more matching contact(s).',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
+              IconButton(
+                onPressed: widget.contactsSyncing
+                    ? null
+                    : widget.onSyncContacts,
+                tooltip: 'Sync device contacts',
+                icon: widget.contactsSyncing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.sync_outlined),
               ),
-          ],
+              IconButton(
+                onPressed: widget.onAddContact,
+                tooltip: 'Add contact',
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SearchBox(
+            controller: _searchController,
+            hintText: 'Search contacts',
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            widget.contactsStatus,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _PanelScrollableContent(
+            enabled: widget.useInternalScroll,
+            children: bodyChildren,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PanelScrollableContent extends StatelessWidget {
+  const _PanelScrollableContent({
+    required this.enabled,
+    required this.children,
+  });
+
+  final bool enabled;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      );
+    }
+
+    return Expanded(
+      child: Scrollbar(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          primary: false,
+          children: children,
         ),
       ),
     );
