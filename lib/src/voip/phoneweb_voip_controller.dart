@@ -20,7 +20,9 @@ class PhoneWebVoipController extends ChangeNotifier
   final RingtonePlayer _ringtone = RingtonePlayer();
   late final Future<void> _remoteAudioReady;
   final Map<String, Timer> _terminatedCallGuards = <String, Timer>{};
+  final Set<String> _confirmedCallIds = <String>{};
   Timer? _callDurationTimer;
+  Timer? _answerConfirmationTimer;
   WebRtcAccount? _account;
   Call? _activeCall;
   DateTime? _callStartedAt;
@@ -51,9 +53,9 @@ class PhoneWebVoipController extends ChangeNotifier
   Direction? get activeCallDirection => _activeCall?.direction;
   bool get hasEstablishedCall =>
       _activeCall != null &&
-      (_callState == CallStateEnum.ACCEPTED ||
-          _callState == CallStateEnum.CONFIRMED ||
-          _callState == CallStateEnum.STREAM ||
+      (_callState == CallStateEnum.CONFIRMED ||
+          (_callState == CallStateEnum.STREAM &&
+              _isCallConfirmed(_activeCall)) ||
           _callState == CallStateEnum.MUTED ||
           _callState == CallStateEnum.UNMUTED ||
           _callState == CallStateEnum.HOLD ||
@@ -198,6 +200,7 @@ class PhoneWebVoipController extends ChangeNotifier
       notifyListeners();
       call.answer(_callOptions(_account), mediaStream: stream);
       _setEvent('Call answer requested');
+      _startAnswerConfirmationTimer(call);
     } catch (error) {
       _lastCallDiagnostic =
           'Could not access microphone or answer call: $error';
@@ -211,6 +214,7 @@ class PhoneWebVoipController extends ChangeNotifier
     final call = _activeCall;
     if (call == null) return;
 
+    _cancelAnswerConfirmationTimer();
     _stopRingtone();
     _guardTerminatedCall(call);
     call.hangup();
@@ -364,6 +368,7 @@ class PhoneWebVoipController extends ChangeNotifier
       case CallStateEnum.NONE:
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
+        _cancelAnswerConfirmationTimer();
         _unguardTerminatedCall(call);
         _clearActiveCall(state.state);
       case CallStateEnum.MUTED:
@@ -389,14 +394,21 @@ class PhoneWebVoipController extends ChangeNotifier
           _startRingback();
         }
       case CallStateEnum.ACCEPTED:
+        _activeCall = call;
+        _stopRingtone();
+        _stopRingback();
       case CallStateEnum.CONFIRMED:
         _activeCall = call;
+        _markCallConfirmed(call);
+        _cancelAnswerConfirmationTimer();
         _stopRingtone();
         _stopRingback();
         _startCallDuration();
       case CallStateEnum.STREAM:
         _activeCall = call;
-        if (state.stream != null && state.originator == Originator.remote) {
+        if (state.stream != null &&
+            state.originator == Originator.remote &&
+            _isCallConfirmed(call)) {
           _stopRingtone();
           _stopRingback();
           _startCallDuration();
@@ -435,6 +447,7 @@ class PhoneWebVoipController extends ChangeNotifier
     _ringtone.dispose();
     _clearRemoteAudio();
     _remoteAudioReady.whenComplete(_remoteAudio.dispose);
+    _cancelAnswerConfirmationTimer();
     _stopCallDuration();
     for (final timer in _terminatedCallGuards.values) {
       timer.cancel();
@@ -620,6 +633,7 @@ class PhoneWebVoipController extends ChangeNotifier
     _stopRingback();
     _stopCallDuration();
     _clearRemoteAudio();
+    _forgetCallConfirmed(_activeCall);
     _activeCall = null;
     _callState = state;
     _muted = false;
@@ -642,6 +656,42 @@ class PhoneWebVoipController extends ChangeNotifier
     _callDurationTimer = null;
     _callStartedAt = null;
     _callDuration = Duration.zero;
+  }
+
+  void _startAnswerConfirmationTimer(Call call) {
+    _cancelAnswerConfirmationTimer();
+    _answerConfirmationTimer = Timer(const Duration(seconds: 12), () {
+      if (_activeCall?.id != call.id || _isCallConfirmed(call)) return;
+      _lastCallDiagnostic =
+          'The call answer was sent, but the SIP dialog was not confirmed by ACK.';
+      _setEvent('Call answer was not confirmed');
+      _guardTerminatedCall(call);
+      call.hangup({'status_code': 408, 'reason_phrase': 'ACK Timeout'});
+      _clearActiveCall(CallStateEnum.FAILED);
+      notifyListeners();
+    });
+  }
+
+  void _cancelAnswerConfirmationTimer() {
+    _answerConfirmationTimer?.cancel();
+    _answerConfirmationTimer = null;
+  }
+
+  void _markCallConfirmed(Call call) {
+    final id = _callGuardId(call);
+    if (id == null) return;
+    _confirmedCallIds.add(id);
+  }
+
+  void _forgetCallConfirmed(Call? call) {
+    final id = call == null ? null : _callGuardId(call);
+    if (id == null) return;
+    _confirmedCallIds.remove(id);
+  }
+
+  bool _isCallConfirmed(Call? call) {
+    final id = call == null ? null : _callGuardId(call);
+    return id != null && _confirmedCallIds.contains(id);
   }
 
   void _startRingtone() {
