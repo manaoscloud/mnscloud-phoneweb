@@ -38,6 +38,8 @@ class PhoneWebVoipController extends ChangeNotifier
   bool _onHold = false;
   bool _started = false;
   bool _manualStopRequested = false;
+  Future<void>? _registerInFlight;
+  String? _activeAccountKey;
 
   WebRtcAccount? get account => _account;
   RegistrationStatus get registrationStatus => _registrationStatus;
@@ -96,6 +98,33 @@ class PhoneWebVoipController extends ChangeNotifier
   }
 
   Future<void> register(WebRtcAccount account) async {
+    final nextAccountKey = _accountKey(account);
+    final sameAccount = _activeAccountKey == nextAccountKey;
+    if (_activeCall != null && !sameAccount) {
+      _setEvent('Cannot switch accounts while a call is active');
+      notifyListeners();
+      return;
+    }
+    if (sameAccount &&
+        _started &&
+        (_helper.registered ||
+            _helper.connected ||
+            _helper.connecting ||
+            _registrationStatus == RegistrationStatus.registering)) {
+      _account = account;
+      if (_helper.registered) {
+        _registrationStatus = RegistrationStatus.registered;
+        _registrationDiagnostic = RegistrationDiagnostic.registered();
+      }
+      _setEvent(
+        _helper.registered
+            ? '${account.name} already registered'
+            : '${account.name} registration already active',
+      );
+      notifyListeners();
+      return _registerInFlight ?? Future<void>.value();
+    }
+
     final password = account.password.trim();
     if (password.isEmpty) {
       _setEvent('Password is required to register ${account.name}');
@@ -119,13 +148,6 @@ class PhoneWebVoipController extends ChangeNotifier
       return;
     }
 
-    _account = account;
-    _manualStopRequested = false;
-    _registrationStatus = RegistrationStatus.registering;
-    _registrationDiagnostic = RegistrationDiagnostic.registering();
-    _setEvent('Registering ${account.name}');
-    notifyListeners();
-
     final settings = UaSettings()
       ..transportType = TransportType.WS
       ..uri = 'sip:${account.username}@${account.domain}'
@@ -141,6 +163,9 @@ class PhoneWebVoipController extends ChangeNotifier
       ..contact_uri = 'sip:${account.username}@${account.domain}'
       ..register = true
       ..register_expires = 600
+      ..connectionRecoveryMinInterval = 15
+      ..connectionRecoveryMaxInterval = 60
+      ..iceGatheringTimeout = 500
       ..iceServers = _iceServers(account);
 
     settings.webSocketSettings.allowBadCertificate =
@@ -148,8 +173,24 @@ class PhoneWebVoipController extends ChangeNotifier
     settings.tcpSocketSettings.allowBadCertificate =
         account.allowInsecureTransport;
 
+    _account = account;
+    _activeAccountKey = nextAccountKey;
+    _manualStopRequested = false;
+    _registrationStatus = RegistrationStatus.registering;
+    _registrationDiagnostic = RegistrationDiagnostic.registering();
+    _setEvent('Registering ${account.name}');
+    notifyListeners();
+
     _started = true;
-    await _helper.start(settings);
+    final future = _helper.start(settings);
+    _registerInFlight = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_registerInFlight, future)) {
+        _registerInFlight = null;
+      }
+    }
   }
 
   Future<void> unregister() async {
@@ -161,6 +202,7 @@ class PhoneWebVoipController extends ChangeNotifier
         _helper.stop();
       }
       _started = false;
+      _activeAccountKey = null;
       _registrationStatus = RegistrationStatus.offline;
       _registrationDiagnostic = RegistrationDiagnostic.stopped();
       _setEvent('Registration stopped');
@@ -492,6 +534,15 @@ class PhoneWebVoipController extends ChangeNotifier
     if (clean.startsWith('sip:')) return clean;
     if (clean.contains('@')) return 'sip:$clean';
     return 'sip:$clean@$domain';
+  }
+
+  String _accountKey(WebRtcAccount account) {
+    return [
+      account.id,
+      account.username.trim().toLowerCase(),
+      account.domain.trim().toLowerCase(),
+      account.wssServer.trim().toLowerCase(),
+    ].join('|');
   }
 
   Future<MediaStream> _microphoneStream() {

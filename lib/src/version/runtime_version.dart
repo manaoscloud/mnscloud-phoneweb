@@ -23,6 +23,12 @@ class RuntimeVersionInfo {
     return compareSemver(latest, version) > 0;
   }
 
+  bool get releaseCatalogBehind {
+    final latest = latestVersion?.trim();
+    if (latest == null || latest.isEmpty) return false;
+    return compareSemver(latest, version) < 0;
+  }
+
   String get displayVersion => 'v$version';
 }
 

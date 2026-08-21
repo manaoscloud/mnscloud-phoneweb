@@ -1871,6 +1871,7 @@ class VersionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final updateAvailable = versionInfo.updateAvailable;
+    final releaseCatalogBehind = versionInfo.releaseCatalogBehind;
     final foreground = updateAvailable
         ? colorScheme.onTertiaryContainer
         : colorScheme.onSurfaceVariant;
@@ -1884,6 +1885,8 @@ class VersionBadge extends StatelessWidget {
     final latest = versionInfo.latestVersion;
     final tooltip = updateAvailable
         ? 'Current $current · New version v$latest available'
+        : releaseCatalogBehind
+        ? 'Current $current · Release catalog still points to v$latest'
         : latest == null
         ? 'Current $current'
         : 'Current $current · Latest v$latest';

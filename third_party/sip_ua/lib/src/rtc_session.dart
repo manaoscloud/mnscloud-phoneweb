@@ -1816,9 +1816,12 @@ class RTCSession extends EventManager implements Owner {
       desc = await modifier(desc);
     }
 
+    Timer? iceGatheringFallbackTimer;
+
     Future<void> ready() async {
       if (!finished && _state != RtcSessionState.terminated) {
         finished = true;
+        clearTimeout(iceGatheringFallbackTimer);
         _connection!.onIceCandidate = null;
         _connection!.onIceGatheringState = null;
         _iceGatheringState = RTCIceGatheringState.RTCIceGatheringStateComplete;
@@ -1860,6 +1863,7 @@ class RTCSession extends EventManager implements Owner {
     try {
       await _connection!.setLocalDescription(desc);
     } catch (error) {
+      clearTimeout(iceGatheringFallbackTimer);
       _rtcReady = true;
       logger.e(
           'emit "peerconnection:setlocaldescriptionfailed" [error:${error.toString()}]');
@@ -1867,9 +1871,21 @@ class RTCSession extends EventManager implements Owner {
       completer.completeError(error);
     }
 
+    // Do not wait indefinitely for the first ICE candidate. Some browsers and
+    // network paths can delay candidate events long enough for upstream SIP
+    // carriers to cancel the unanswered INVITE. The SIP answer should be sent
+    // after the configured ICE gathering timeout even when no candidate event
+    // was emitted yet; subsequent media still relies on the SDP currently
+    // available from the browser.
+    if (ua.configuration.ice_gathering_timeout != 0 && !finished) {
+      iceGatheringFallbackTimer =
+          setTimeout(() => ready(), ua.configuration.ice_gathering_timeout);
+    }
+
     // Resolve right away if 'pc.iceGatheringState' is 'complete'.
     if (_iceGatheringState ==
         RTCIceGatheringState.RTCIceGatheringStateComplete) {
+      clearTimeout(iceGatheringFallbackTimer);
       _rtcReady = true;
       RTCSessionDescription? desc = await _connection!.getLocalDescription();
       logger.d('emit "sdp"');
