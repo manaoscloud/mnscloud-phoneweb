@@ -660,7 +660,13 @@ class RTCSession extends EventManager implements Owner {
     RTCSessionDescription offer =
         RTCSessionDescription(processedSDP, SdpType.offer.name);
     try {
+      _debugCall('answer.set_remote_description.start', {
+        'sdpLength': processedSDP?.length,
+      });
       await _connection!.setRemoteDescription(offer);
+      _debugCall('answer.set_remote_description.success', {
+        'signalingState': _connection?.signalingState?.name,
+      });
     } catch (error) {
       final reason = 'SetRemoteDescription failed: ${error.toString()}';
       request.reply(488, reason);
@@ -682,6 +688,9 @@ class RTCSession extends EventManager implements Owner {
     _connecting(request);
     RTCSessionDescription desc;
     try {
+      _debugCall('answer.local_description.start', {
+        'lateSdp': _late_sdp,
+      });
       if (!_late_sdp) {
         desc =
             await _createLocalDescription(SdpType.answer, rtcAnswerConstraints);
@@ -689,6 +698,10 @@ class RTCSession extends EventManager implements Owner {
         desc =
             await _createLocalDescription(SdpType.offer, _rtcOfferConstraints);
       }
+      _debugCall('answer.local_description.success', {
+        'type': desc.type,
+        'sdpLength': desc.sdp?.length,
+      });
     } catch (e) {
       final reason = 'CreateLocalDescription failed: ${e.toString()}';
       request.reply(500, reason);
@@ -707,12 +720,20 @@ class RTCSession extends EventManager implements Owner {
     // Send reply.
     try {
       _handleSessionTimersInIncomingRequest(request, extraHeaders);
+      _debugCall('answer.reply_200.start', {
+        'sdpLength': desc.sdp?.length,
+        'extraHeaders': extraHeaders.length,
+      });
       request.reply(200, null, extraHeaders, desc.sdp, () {
+        _debugCall('answer.reply_200.success', {
+          'state': RtcSessionState.waitingForAck.name,
+        });
         _state = RtcSessionState.waitingForAck;
         _setInvite2xxTimer(request, desc.sdp);
         _setACKTimer();
         _accepted(Originator.local);
       }, () {
+        _debugCall('answer.reply_200.transport_error');
         _failed(Originator.system, null, null, null, 500,
             DartSIP_C.CausesType.CONNECTION_ERROR, 'Transport Error');
       });
@@ -1771,6 +1792,12 @@ class RTCSession extends EventManager implements Owner {
   Future<RTCSessionDescription> _createLocalDescription(
       SdpType type, Map<String, dynamic>? constraints) async {
     logger.d('createLocalDescription()');
+    _debugCall('local_description.create.start', {
+      'type': type.name,
+      'iceGatheringTimeout': ua.configuration.ice_gathering_timeout,
+      'signalingState': _connection?.signalingState?.name,
+      'iceGatheringState': _connection?.iceGatheringState?.name,
+    });
     _iceGatheringState ??= RTCIceGatheringState.RTCIceGatheringStateNew;
     Completer<RTCSessionDescription> completer =
         Completer<RTCSessionDescription>();
@@ -1796,7 +1823,11 @@ class RTCSession extends EventManager implements Owner {
     late RTCSessionDescription desc;
     if (type == SdpType.offer) {
       try {
+        _debugCall('local_description.create_offer.start');
         desc = await _connection!.createOffer(constraints);
+        _debugCall('local_description.create_offer.success', {
+          'sdpLength': desc.sdp?.length,
+        });
       } catch (error) {
         logger.e(
             'emit "peerconnection:createofferfailed" [error:${error.toString()}]');
@@ -1805,7 +1836,11 @@ class RTCSession extends EventManager implements Owner {
       }
     } else {
       try {
+        _debugCall('local_description.create_answer.start');
         desc = await _connection!.createAnswer(constraints);
+        _debugCall('local_description.create_answer.success', {
+          'sdpLength': desc.sdp?.length,
+        });
       } catch (error) {
         logger.e(
             'emit "peerconnection:createanswerfailed" [error:${error.toString()}]');
@@ -1833,6 +1868,11 @@ class RTCSession extends EventManager implements Owner {
         _iceGatheringState = RTCIceGatheringState.RTCIceGatheringStateComplete;
         _rtcReady = true;
         RTCSessionDescription? desc = await _connection!.getLocalDescription();
+        _debugCall('local_description.ice.ready', {
+          'type': type.name,
+          'sdpLength': desc?.sdp?.length,
+          'iceGatheringState': _iceGatheringState?.name,
+        });
         logger.d('emit "sdp"');
         emit(
             EventSdp(originator: Originator.local, type: type, sdp: desc!.sdp));
@@ -1842,6 +1882,7 @@ class RTCSession extends EventManager implements Owner {
 
     _connection!.onIceGatheringState = (RTCIceGatheringState state) {
       _iceGatheringState = state;
+      _debugCall('local_description.ice.state', {'state': state.name});
       if (state == RTCIceGatheringState.RTCIceGatheringStateComplete) {
         ready();
       }
@@ -1850,6 +1891,9 @@ class RTCSession extends EventManager implements Owner {
     bool hasCandidate = false;
     _connection!.onIceCandidate = (RTCIceCandidate candidate) {
       if (candidate != null) {
+        _debugCall('local_description.ice.candidate', {
+          'candidateLength': candidate.candidate?.length,
+        });
         emit(EventIceCandidate(candidate, ready));
         if (!hasCandidate) {
           hasCandidate = true;
@@ -1867,7 +1911,15 @@ class RTCSession extends EventManager implements Owner {
     };
 
     try {
+      _debugCall('local_description.set_local.start', {
+        'type': desc.type,
+        'sdpLength': desc.sdp?.length,
+      });
       await _connection!.setLocalDescription(desc);
+      _debugCall('local_description.set_local.success', {
+        'signalingState': _connection?.signalingState?.name,
+        'iceGatheringState': _connection?.iceGatheringState?.name,
+      });
     } catch (error) {
       clearTimeout(iceGatheringFallbackTimer);
       _rtcReady = true;
@@ -1884,6 +1936,9 @@ class RTCSession extends EventManager implements Owner {
     // was emitted yet; subsequent media still relies on the SDP currently
     // available from the browser.
     if (ua.configuration.ice_gathering_timeout != 0 && !finished) {
+      _debugCall('local_description.ice.fallback_timer.start', {
+        'timeoutMs': ua.configuration.ice_gathering_timeout,
+      });
       iceGatheringFallbackTimer =
           setTimeout(() => ready(), ua.configuration.ice_gathering_timeout);
     }
@@ -1894,6 +1949,10 @@ class RTCSession extends EventManager implements Owner {
       clearTimeout(iceGatheringFallbackTimer);
       _rtcReady = true;
       RTCSessionDescription? desc = await _connection!.getLocalDescription();
+      _debugCall('local_description.ice.already_complete', {
+        'type': type.name,
+        'sdpLength': desc?.sdp?.length,
+      });
       logger.d('emit "sdp"');
       emit(EventSdp(originator: Originator.local, type: type, sdp: desc!.sdp));
       return desc;
@@ -3482,6 +3541,10 @@ class RTCSession extends EventManager implements Owner {
     _is_confirmed = true;
     logger.d('emit "confirmed"');
     emit(EventCallConfirmed(session: this, originator: originator, ack: ack));
+  }
+
+  void _debugCall(String event, [Map<String, Object?>? data]) {
+    emit(EventCallDebug(session: this, event: event, data: data));
   }
 
   void _ended(

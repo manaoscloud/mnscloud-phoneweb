@@ -350,6 +350,9 @@ class SIPUAHelper extends EventManager {
                 stream: event.stream, originator: event.originator));
       });
     });
+    handlers.on(EventCallDebug(), (EventCallDebug event) {
+      _notifyCallDebugListeners(event);
+    });
 
     handlers.on(EventReInvite(), (EventReInvite event) {
       logger.d('Reinvite received in helper, notifying listeners');
@@ -492,6 +495,18 @@ class SIPUAHelper extends EventManager {
     List<SipUaHelperListener> listeners = _sipUaHelperListeners.toList();
     for (SipUaHelperListener listener in listeners) {
       listener.onNewMessage(msg);
+    }
+  }
+
+  void _notifyCallDebugListeners(EventCallDebug event) {
+    Call? call = _calls[event.id];
+    if (call == null) {
+      logger.e('Call ${event.id} not found for debug event ${event.event}!');
+      return;
+    }
+    List<SipUaHelperListener> listeners = _sipUaHelperListeners.toList();
+    for (SipUaHelperListener listener in listeners) {
+      listener.onCallDebug(call, event.event, event.data ?? const {});
     }
   }
 
@@ -771,6 +786,7 @@ abstract class SipUaHelperListener {
   void transportStateChanged(TransportState state);
   void registrationStateChanged(RegistrationState state);
   void callStateChanged(Call call, CallState state);
+  void onCallDebug(Call call, String event, Map<String, Object?> data);
   //For SIP message coming
   void onNewMessage(SIPMessageRequest msg);
   void onNewNotify(Notify ntf);

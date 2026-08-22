@@ -105,6 +105,13 @@ class EventStream extends CallEvent {
   MediaStream? stream;
 }
 
+class EventCallDebug extends CallEvent {
+  EventCallDebug({RTCSession? session, this.event = '', this.data})
+      : super(session);
+  String event;
+  Map<String, Object?>? data;
+}
+
 class EventCallRefer extends CallEvent {
   EventCallRefer({RTCSession? session, this.aor, this.accept, this.reject})
       : super(session);

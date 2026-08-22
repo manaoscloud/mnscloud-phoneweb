@@ -529,6 +529,12 @@ class PhoneWebVoipController extends ChangeNotifier
   }
 
   @override
+  void onCallDebug(Call call, String event, Map<String, Object?> data) {
+    _debug('sdk.$event', {..._callDebugData(call), ...data});
+    notifyListeners();
+  }
+
+  @override
   void onNewMessage(SIPMessageRequest msg) {
     _debug('sip.message.received', {
       'direction': msg.originator?.name,
