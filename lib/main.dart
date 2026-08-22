@@ -378,6 +378,13 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     });
   }
 
+  Future<void> _openDebugDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => PhoneWebDebugDialog(voip: _voip),
+    );
+  }
+
   Future<void> _syncNativeContacts() async {
     if (_contactsSyncing) return;
 
@@ -466,7 +473,11 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
               AppHeader(
                 accountCount: _accounts.length,
                 runtimeVersion: _runtimeVersion,
+                debugEnabled: _voip.debugLoggingEnabled,
                 onRefreshVersion: _refreshRuntimeVersion,
+                onToggleDebug: () =>
+                    _voip.setDebugLoggingEnabled(!_voip.debugLoggingEnabled),
+                onOpenDebug: _openDebugDialog,
                 onAddAccount: () => _openAccountDialog(),
               ),
               const SizedBox(height: 20),
@@ -1790,14 +1801,20 @@ class AppHeader extends StatelessWidget {
   const AppHeader({
     required this.accountCount,
     required this.runtimeVersion,
+    required this.debugEnabled,
     required this.onRefreshVersion,
+    required this.onToggleDebug,
+    required this.onOpenDebug,
     required this.onAddAccount,
     super.key,
   });
 
   final int accountCount;
   final RuntimeVersionInfo runtimeVersion;
+  final bool debugEnabled;
   final VoidCallback onRefreshVersion;
+  final VoidCallback onToggleDebug;
+  final VoidCallback onOpenDebug;
   final VoidCallback onAddAccount;
 
   @override
@@ -1842,6 +1859,18 @@ class AppHeader extends StatelessWidget {
             VersionBadge(
               versionInfo: runtimeVersion,
               onRefresh: onRefreshVersion,
+            ),
+            OutlinedButton.icon(
+              onPressed: onToggleDebug,
+              icon: Icon(
+                debugEnabled ? Icons.bug_report : Icons.bug_report_outlined,
+              ),
+              label: Text(debugEnabled ? 'Debug on' : 'Debug off'),
+            ),
+            IconButton.outlined(
+              onPressed: onOpenDebug,
+              tooltip: 'Open PhoneWeb debug log',
+              icon: const Icon(Icons.article_outlined),
             ),
             FilledButton.icon(
               onPressed: onAddAccount,
@@ -1935,6 +1964,106 @@ class VersionBadge extends StatelessWidget {
               onTap: onRefresh,
               child: badge,
             ),
+    );
+  }
+}
+
+class PhoneWebDebugDialog extends StatefulWidget {
+  const PhoneWebDebugDialog({required this.voip, super.key});
+
+  final PhoneWebVoipController voip;
+
+  @override
+  State<PhoneWebDebugDialog> createState() => _PhoneWebDebugDialogState();
+}
+
+class _PhoneWebDebugDialogState extends State<PhoneWebDebugDialog> {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final logText = widget.voip.debugLogText();
+    return AlertDialog(
+      title: const Text('PhoneWeb debug'),
+      content: SizedBox(
+        width: 760,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.68,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: widget.voip.debugLoggingEnabled,
+                onChanged: (enabled) {
+                  widget.voip.setDebugLoggingEnabled(enabled);
+                  setState(() {});
+                },
+                title: const Text('Ativar debug detalhado'),
+                subtitle: const Text(
+                  'Capture eventos SIP/WebRTC, mídia, registro e ações da tela para copiar e enviar para análise.',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${widget.voip.debugEvents.length} evento(s) capturado(s). O buffer mantém os últimos 600 eventos.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.55,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      logText,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton.icon(
+          onPressed: () {
+            widget.voip.clearDebugLog();
+            setState(() {});
+          },
+          icon: const Icon(Icons.delete_sweep_outlined),
+          label: const Text('Limpar'),
+        ),
+        TextButton.icon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: logText));
+            if (context.mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Debug copiado')));
+            }
+          },
+          icon: const Icon(Icons.copy_outlined),
+          label: const Text('Copiar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+      ],
     );
   }
 }

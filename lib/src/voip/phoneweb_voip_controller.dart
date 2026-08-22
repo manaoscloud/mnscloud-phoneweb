@@ -34,12 +34,14 @@ class PhoneWebVoipController extends ChangeNotifier
   CallStateEnum _callState = CallStateEnum.NONE;
   String _lastEvent = 'Ready';
   String _lastCallDiagnostic = '';
+  bool _debugLoggingEnabled = false;
   bool _muted = false;
   bool _onHold = false;
   bool _started = false;
   bool _manualStopRequested = false;
   Future<void>? _registerInFlight;
   String? _activeAccountKey;
+  final List<PhoneWebDebugEvent> _debugEvents = <PhoneWebDebugEvent>[];
 
   WebRtcAccount? get account => _account;
   RegistrationStatus get registrationStatus => _registrationStatus;
@@ -48,6 +50,8 @@ class PhoneWebVoipController extends ChangeNotifier
   CallStateEnum get callState => _callState;
   String get lastEvent => _lastEvent;
   String get lastCallDiagnostic => _lastCallDiagnostic;
+  bool get debugLoggingEnabled => _debugLoggingEnabled;
+  List<PhoneWebDebugEvent> get debugEvents => List.unmodifiable(_debugEvents);
   bool get muted => _muted;
   bool get onHold => _onHold;
   Duration get callDuration => _callDuration;
@@ -98,6 +102,15 @@ class PhoneWebVoipController extends ChangeNotifier
   }
 
   Future<void> register(WebRtcAccount account) async {
+    _debug('register.request', {
+      'account': account.name,
+      'username': account.username,
+      'domain': account.domain,
+      'wss': account.wssServer,
+      'status': account.status.name,
+      'autoRegister': account.autoRegister,
+      'enabled': account.enabled,
+    });
     final nextAccountKey = _accountKey(account);
     final sameAccount = _activeAccountKey == nextAccountKey;
     if (_activeCall != null && !sameAccount) {
@@ -246,7 +259,11 @@ class PhoneWebVoipController extends ChangeNotifier
     if (call == null) return;
 
     try {
+      _debug('call.answer.request', _callDebugData(call));
       final stream = await _microphoneStream();
+      _debug('media.microphone.granted', {
+        'tracks': stream.getTracks().map((track) => track.kind).join(','),
+      });
       _setEvent('Answering call');
       notifyListeners();
       _markAnswerRequested(call);
@@ -255,6 +272,10 @@ class PhoneWebVoipController extends ChangeNotifier
       _setEvent('Call answer requested');
       _startAnswerConfirmationTimer(call);
     } catch (error) {
+      _debug('call.answer.error', {
+        ..._callDebugData(call),
+        'error': error.toString(),
+      });
       _lastCallDiagnostic =
           'Could not access microphone or answer call: $error';
       _setEvent('Call answer failed');
@@ -267,6 +288,7 @@ class PhoneWebVoipController extends ChangeNotifier
     final call = _activeCall;
     if (call == null) return;
 
+    _debug('call.hangup.request', _callDebugData(call));
     _cancelAnswerConfirmationTimer();
     _stopRingtone();
     _guardTerminatedCall(call);
@@ -309,6 +331,12 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void transportStateChanged(TransportState state) {
+    _debug('transport.state', {
+      'state': state.state.name,
+      'statusCode': state.cause?.status_code,
+      'cause': state.cause?.cause,
+      'reason': state.cause?.reason_phrase,
+    });
     _transportState = state.state;
     if (state.state == TransportStateEnum.DISCONNECTED &&
         !_manualStopRequested) {
@@ -332,6 +360,12 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void registrationStateChanged(RegistrationState state) {
+    _debug('registration.state', {
+      'state': state.state?.name,
+      'statusCode': state.cause?.status_code,
+      'cause': state.cause?.cause,
+      'reason': state.cause?.reason_phrase,
+    });
     if (!_manualStopRequested &&
         _helper.registered &&
         (state.state == RegistrationStateEnum.REGISTRATION_FAILED ||
@@ -398,6 +432,17 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void callStateChanged(Call call, CallState state) {
+    _debug('call.state', {
+      ..._callDebugData(call),
+      'state': state.state.name,
+      'originator': state.originator?.name,
+      'hasStream': state.stream != null,
+      'statusCode': state.cause?.status_code,
+      'cause': state.cause?.cause,
+      'reason': state.cause?.reason_phrase,
+      'confirmed': _isCallConfirmed(call),
+      'answerRequested': _isAnswerRequested(call),
+    });
     if (_isGuardedTerminatedCall(call)) {
       _setEvent('Ignored stale call ${state.state.name.toLowerCase()}');
       notifyListeners();
@@ -463,6 +508,10 @@ class PhoneWebVoipController extends ChangeNotifier
         _activeCall = call;
         _markAnswerRequested(call);
         if (state.stream != null && state.originator == Originator.remote) {
+          _debug('media.remote_stream.received', {
+            ..._callDebugData(call),
+            'confirmed': _isCallConfirmed(call),
+          });
           _stopRingtone();
           _stopRingback();
           _attachRemoteStream(state.stream!);
@@ -481,18 +530,27 @@ class PhoneWebVoipController extends ChangeNotifier
 
   @override
   void onNewMessage(SIPMessageRequest msg) {
+    _debug('sip.message.received', {
+      'direction': msg.originator?.name,
+      'method': msg.request?.method,
+    });
     _setEvent('SIP message received');
     notifyListeners();
   }
 
   @override
   void onNewNotify(Notify ntf) {
+    _debug('sip.notify.received', {'method': ntf.request?.method});
     _setEvent('SIP notify received');
     notifyListeners();
   }
 
   @override
   void onNewReinvite(ReInvite event) {
+    _debug('sip.reinvite.received', {
+      'hasAudio': event.hasAudio,
+      'hasVideo': event.hasVideo,
+    });
     _setEvent('SIP re-invite received');
     notifyListeners();
   }
@@ -795,12 +853,21 @@ class PhoneWebVoipController extends ChangeNotifier
   }
 
   void _attachRemoteStream(MediaStream stream) {
+    _debug('media.remote_stream.attach.request', {
+      'tracks': stream.getTracks().map((track) => track.kind).join(','),
+    });
     _remoteAudioReady
         .then((_) {
           _remoteAudio.srcObject = stream;
           _remoteAudio.setVolume(1);
+          _debug('media.remote_stream.attach.success', {
+            'srcObject': _remoteAudio.srcObject != null,
+          });
         })
         .catchError((Object error) {
+          _debug('media.remote_stream.attach.error', {
+            'error': error.toString(),
+          });
           _setEvent('Remote audio could not be attached');
           notifyListeners();
         });
@@ -816,6 +883,7 @@ class PhoneWebVoipController extends ChangeNotifier
 
   void _setEvent(String event) {
     _lastEvent = event;
+    _debug('ui.event', {'event': event});
   }
 
   String _callDiagnosticFromState(CallState state) {
@@ -829,5 +897,97 @@ class PhoneWebVoipController extends ChangeNotifier
         cause.cause!.trim(),
     ];
     return parts.join(' · ');
+  }
+
+  void setDebugLoggingEnabled(bool enabled) {
+    if (_debugLoggingEnabled == enabled) return;
+    _debugLoggingEnabled = enabled;
+    _debug(enabled ? 'debug.enabled' : 'debug.disabled', {
+      'account': _account?.name,
+      'registrationStatus': _registrationStatus.name,
+      'transportState': _transportState.name,
+      'callState': _callState.name,
+    }, force: true);
+    notifyListeners();
+  }
+
+  void clearDebugLog() {
+    _debugEvents.clear();
+    _debug('debug.cleared', const <String, Object?>{}, force: true);
+    notifyListeners();
+  }
+
+  String debugLogText() {
+    final account = _account;
+    final header = <String>[
+      'MNSCloud PhoneWeb debug log',
+      'Generated at: ${DateTime.now().toIso8601String()}',
+      'Debug enabled: $_debugLoggingEnabled',
+      'Account: ${account?.name ?? '-'}',
+      'SIP user: ${account == null ? '-' : '${account.username}@${account.domain}'}',
+      'WSS: ${account?.wssServer ?? '-'}',
+      'Registration status: ${_registrationStatus.name}',
+      'Registration diagnostic: ${_registrationDiagnostic?.copyText ?? '-'}',
+      'Transport state: ${_transportState.name}',
+      'Call state: ${_callState.name}',
+      'Active call: ${_activeCall == null ? 'no' : 'yes'}',
+      'Remote identity: $remoteIdentity',
+      'Last event: $_lastEvent',
+      'Last call diagnostic: ${_lastCallDiagnostic.isEmpty ? '-' : _lastCallDiagnostic}',
+      '---- events ----',
+    ];
+    return [
+      ...header,
+      ..._debugEvents.map((event) => event.toLine()),
+    ].join('\n');
+  }
+
+  void _debug(String event, Map<String, Object?> data, {bool force = false}) {
+    if (!_debugLoggingEnabled && !force) return;
+    _debugEvents.add(
+      PhoneWebDebugEvent(
+        observedAt: DateTime.now(),
+        event: event,
+        data: Map<String, Object?>.from(data),
+      ),
+    );
+    if (_debugEvents.length > 600) {
+      _debugEvents.removeRange(0, _debugEvents.length - 600);
+    }
+  }
+
+  Map<String, Object?> _callDebugData(Call call) {
+    return <String, Object?>{
+      'callId': call.id,
+      'direction': call.direction?.name,
+      'remoteIdentity': call.remote_identity,
+      'localIdentity': call.local_identity,
+      'state': call.state.name,
+    };
+  }
+}
+
+class PhoneWebDebugEvent {
+  const PhoneWebDebugEvent({
+    required this.observedAt,
+    required this.event,
+    required this.data,
+  });
+
+  final DateTime observedAt;
+  final String event;
+  final Map<String, Object?> data;
+
+  String toLine() {
+    final fields = data.entries
+        .where((entry) => entry.value != null)
+        .map((entry) => '${entry.key}=${_safe(entry.value)}')
+        .join(' ');
+    return '${observedAt.toIso8601String()} $event${fields.isEmpty ? '' : ' $fields'}';
+  }
+
+  static String _safe(Object? value) {
+    if (value == null) return '';
+    return value.toString().replaceAll('\n', r'\n').replaceAll('\r', r'\r');
   }
 }
