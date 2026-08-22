@@ -729,7 +729,8 @@ class PhoneWebVoipController extends ChangeNotifier
     _answerConfirmationTimer = Timer(const Duration(seconds: 12), () {
       if (_activeCall?.id != call.id || _isCallConfirmed(call)) return;
       _lastCallDiagnostic =
-          'The call answer was sent, but the SIP dialog was not confirmed by ACK.';
+          'The call answer was requested, but the SIP dialog was not confirmed. '
+          'No confirmed 200 OK/ACK exchange was observed before the timeout.';
       _setEvent('Call answer was not confirmed');
       _guardTerminatedCall(call);
       call.hangup({'status_code': 408, 'reason_phrase': 'ACK Timeout'});
