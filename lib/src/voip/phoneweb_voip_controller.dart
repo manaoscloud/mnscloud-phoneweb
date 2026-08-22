@@ -629,7 +629,6 @@ class PhoneWebVoipController extends ChangeNotifier
       options['rtcAnswerConstraints'] as Map,
     );
     rtcOfferConstraints['offerModifiers'] = [modifier];
-    rtcAnswerConstraints['offerModifiers'] = [modifier];
 
     return {
       ...options,
