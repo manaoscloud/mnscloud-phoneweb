@@ -2462,6 +2462,7 @@ class _DebugSettingsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
+          width: double.infinity,
           height: 260,
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -2471,13 +2472,19 @@ class _DebugSettingsSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: colorScheme.outlineVariant),
             ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(12),
-              child: SelectableText(
-                logText,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SelectableText(
+                    logText,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                  ),
+                ),
               ),
             ),
           ),
