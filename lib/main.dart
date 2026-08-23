@@ -449,10 +449,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     return null;
   }
 
-  Future<void> _openDebugDialog() async {
+  Future<void> _openSettingsDialog() async {
     await showDialog<void>(
       context: context,
-      builder: (context) => PhoneWebDebugDialog(voip: _voip),
+      builder: (context) => PhoneWebSettingsDialog(
+        voip: _voip,
+        runtimeVersion: _runtimeVersion,
+        onRefreshVersion: _refreshRuntimeVersion,
+      ),
     );
   }
 
@@ -506,12 +510,12 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         voip: _voip,
         currentIndex: _mobileTabIndex,
         lastEvent: _lastEvent,
-        runtimeVersion: _runtimeVersion,
         onTabChanged: (index) => setState(() => _mobileTabIndex = index),
         onAppend: _appendDial,
         onBackspace: _backspaceDial,
         onClear: _clearDial,
         onCall: _makeCall,
+        onOpenSettings: _openSettingsDialog,
         onAddAccount: () => _openAccountDialog(),
         onEditAccount: (account) => _openAccountDialog(account: account),
         onRemoveAccount: _removeAccount,
@@ -547,12 +551,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
             children: [
               AppHeader(
                 accountCount: _accounts.length,
-                runtimeVersion: _runtimeVersion,
-                debugEnabled: _voip.debugLoggingEnabled,
-                onRefreshVersion: _refreshRuntimeVersion,
-                onToggleDebug: () =>
-                    _voip.setDebugLoggingEnabled(!_voip.debugLoggingEnabled),
-                onOpenDebug: _openDebugDialog,
+                onOpenSettings: _openSettingsDialog,
                 onAddAccount: () => _openAccountDialog(),
               ),
               const SizedBox(height: 20),
@@ -800,12 +799,12 @@ class MobilePhoneShell extends StatelessWidget {
     required this.voip,
     required this.currentIndex,
     required this.lastEvent,
-    required this.runtimeVersion,
     required this.onTabChanged,
     required this.onAppend,
     required this.onBackspace,
     required this.onClear,
     required this.onCall,
+    required this.onOpenSettings,
     required this.onAddAccount,
     required this.onEditAccount,
     required this.onRemoveAccount,
@@ -833,12 +832,12 @@ class MobilePhoneShell extends StatelessWidget {
   final PhoneWebVoipController voip;
   final int currentIndex;
   final String lastEvent;
-  final RuntimeVersionInfo runtimeVersion;
   final ValueChanged<int> onTabChanged;
   final ValueChanged<String> onAppend;
   final VoidCallback onBackspace;
   final VoidCallback onClear;
   final VoidCallback onCall;
+  final VoidCallback onOpenSettings;
   final VoidCallback onAddAccount;
   final ValueChanged<WebRtcAccount> onEditAccount;
   final ValueChanged<WebRtcAccount> onRemoveAccount;
@@ -900,7 +899,7 @@ class MobilePhoneShell extends StatelessWidget {
             MobileTopBar(
               account: selectedAccount,
               accountCount: accounts.length,
-              runtimeVersion: runtimeVersion,
+              onSettings: onOpenSettings,
               onAccounts: () => _showAccountsSheet(context),
             ),
             Expanded(child: pages[currentIndex]),
@@ -1140,14 +1139,14 @@ class MobileTopBar extends StatelessWidget {
   const MobileTopBar({
     required this.account,
     required this.accountCount,
-    required this.runtimeVersion,
+    required this.onSettings,
     required this.onAccounts,
     super.key,
   });
 
   final WebRtcAccount? account;
   final int accountCount;
-  final RuntimeVersionInfo runtimeVersion;
+  final VoidCallback onSettings;
   final VoidCallback onAccounts;
 
   @override
@@ -1214,12 +1213,10 @@ class MobileTopBar extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(
-            width: 82,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: VersionBadge(versionInfo: runtimeVersion, compact: true),
-            ),
+          IconButton(
+            onPressed: onSettings,
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings_outlined),
           ),
         ],
       ),
@@ -1950,21 +1947,13 @@ class MobileEmptyTab extends StatelessWidget {
 class AppHeader extends StatelessWidget {
   const AppHeader({
     required this.accountCount,
-    required this.runtimeVersion,
-    required this.debugEnabled,
-    required this.onRefreshVersion,
-    required this.onToggleDebug,
-    required this.onOpenDebug,
+    required this.onOpenSettings,
     required this.onAddAccount,
     super.key,
   });
 
   final int accountCount;
-  final RuntimeVersionInfo runtimeVersion;
-  final bool debugEnabled;
-  final VoidCallback onRefreshVersion;
-  final VoidCallback onToggleDebug;
-  final VoidCallback onOpenDebug;
+  final VoidCallback onOpenSettings;
   final VoidCallback onAddAccount;
 
   @override
@@ -2006,21 +1995,10 @@ class AppHeader extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           alignment: compact ? WrapAlignment.start : WrapAlignment.end,
           children: [
-            VersionBadge(
-              versionInfo: runtimeVersion,
-              onRefresh: onRefreshVersion,
-            ),
             OutlinedButton.icon(
-              onPressed: onToggleDebug,
-              icon: Icon(
-                debugEnabled ? Icons.bug_report : Icons.bug_report_outlined,
-              ),
-              label: Text(debugEnabled ? 'Debug on' : 'Debug off'),
-            ),
-            IconButton.outlined(
-              onPressed: onOpenDebug,
-              tooltip: 'Open PhoneWeb debug log',
-              icon: const Icon(Icons.article_outlined),
+              onPressed: onOpenSettings,
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Settings'),
             ),
             FilledButton.icon(
               onPressed: onAddAccount,
@@ -2118,102 +2096,377 @@ class VersionBadge extends StatelessWidget {
   }
 }
 
-class PhoneWebDebugDialog extends StatefulWidget {
-  const PhoneWebDebugDialog({required this.voip, super.key});
+enum PhoneWebSettingsSection { interface, audioVideo, debug }
+
+class PhoneWebSettingsDialog extends StatefulWidget {
+  const PhoneWebSettingsDialog({
+    required this.voip,
+    required this.runtimeVersion,
+    required this.onRefreshVersion,
+    super.key,
+  });
 
   final PhoneWebVoipController voip;
+  final RuntimeVersionInfo runtimeVersion;
+  final VoidCallback onRefreshVersion;
 
   @override
-  State<PhoneWebDebugDialog> createState() => _PhoneWebDebugDialogState();
+  State<PhoneWebSettingsDialog> createState() => _PhoneWebSettingsDialogState();
 }
 
-class _PhoneWebDebugDialogState extends State<PhoneWebDebugDialog> {
+class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
+  PhoneWebSettingsSection _section = PhoneWebSettingsSection.interface;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final logText = widget.voip.debugLogText();
+    final compact = MediaQuery.sizeOf(context).width < 720;
+
     return AlertDialog(
-      title: const Text('PhoneWeb debug'),
+      title: const Text('Settings'),
       content: SizedBox(
-        width: 760,
+        width: 860,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.68,
+            maxHeight: MediaQuery.sizeOf(context).height * 0.74,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                value: widget.voip.debugLoggingEnabled,
-                onChanged: (enabled) {
-                  widget.voip.setDebugLoggingEnabled(enabled);
-                  setState(() {});
-                },
-                title: const Text('Ativar debug detalhado'),
-                subtitle: const Text(
-                  'Capture eventos SIP/WebRTC, mídia, registro e ações da tela para copiar e enviar para análise.',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${widget.voip.debugEvents.length} evento(s) capturado(s). O buffer mantém os últimos 600 eventos.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.55,
+          child: compact
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _SettingsSectionSelector(
+                      selected: _section,
+                      onSelected: (section) =>
+                          setState(() => _section = section),
+                      compact: true,
                     ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: colorScheme.outlineVariant),
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(12),
-                    child: SelectableText(
-                      logText,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                    const SizedBox(height: 14),
+                    Flexible(child: _buildSelectedSection(colorScheme)),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 220,
+                      child: _SettingsSectionSelector(
+                        selected: _section,
+                        onSelected: (section) =>
+                            setState(() => _section = section),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 18),
+                    Expanded(child: _buildSelectedSection(colorScheme)),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
       actions: [
-        TextButton.icon(
-          onPressed: () {
-            widget.voip.clearDebugLog();
-            setState(() {});
-          },
-          icon: const Icon(Icons.delete_sweep_outlined),
-          label: const Text('Limpar'),
-        ),
-        TextButton.icon(
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: logText));
-            if (context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Debug copiado')));
-            }
-          },
-          icon: const Icon(Icons.copy_outlined),
-          label: const Text('Copiar'),
-        ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Fechar'),
         ),
       ],
+    );
+  }
+
+  Widget _buildSelectedSection(ColorScheme colorScheme) {
+    return switch (_section) {
+      PhoneWebSettingsSection.interface => _InterfaceSettingsSection(
+        versionInfo: widget.runtimeVersion,
+        onRefreshVersion: widget.onRefreshVersion,
+      ),
+      PhoneWebSettingsSection.audioVideo => const _AudioVideoSettingsSection(),
+      PhoneWebSettingsSection.debug => _DebugSettingsSection(
+        voip: widget.voip,
+        onChanged: () => setState(() {}),
+      ),
+    };
+  }
+}
+
+class _SettingsSectionSelector extends StatelessWidget {
+  const _SettingsSectionSelector({
+    required this.selected,
+    required this.onSelected,
+    this.compact = false,
+  });
+
+  final PhoneWebSettingsSection selected;
+  final ValueChanged<PhoneWebSettingsSection> onSelected;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (PhoneWebSettingsSection.interface, Icons.palette_outlined, 'Interface'),
+      (
+        PhoneWebSettingsSection.audioVideo,
+        Icons.perm_media_outlined,
+        'Áudio e Vídeo',
+      ),
+      (PhoneWebSettingsSection.debug, Icons.bug_report_outlined, 'Debug'),
+    ];
+
+    if (compact) {
+      return SegmentedButton<PhoneWebSettingsSection>(
+        segments: [
+          for (final item in items)
+            ButtonSegment(
+              value: item.$1,
+              icon: Icon(item.$2),
+              label: Text(item.$3),
+            ),
+        ],
+        selected: {selected},
+        onSelectionChanged: (selection) => onSelected(selection.first),
+      );
+    }
+
+    return Column(
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              selected: selected == item.$1,
+              selectedTileColor: Theme.of(
+                context,
+              ).colorScheme.secondaryContainer.withValues(alpha: 0.44),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              leading: Icon(item.$2),
+              title: Text(item.$3),
+              onTap: () => onSelected(item.$1),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _InterfaceSettingsSection extends StatelessWidget {
+  const _InterfaceSettingsSection({
+    required this.versionInfo,
+    required this.onRefreshVersion,
+  });
+
+  final RuntimeVersionInfo versionInfo;
+  final VoidCallback onRefreshVersion;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _SettingsSectionCard(
+      title: 'Interface',
+      subtitle: 'Preferências visuais do PhoneWeb.',
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.brightness_auto_outlined),
+          title: const Text('Tema'),
+          subtitle: const Text('Automático pelo sistema'),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.translate_outlined),
+          title: const Text('Idioma'),
+          subtitle: const Text('Automático pelo navegador/sistema'),
+        ),
+        const Divider(height: 28),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Versão',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            VersionBadge(versionInfo: versionInfo, onRefresh: onRefreshVersion),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'O badge de versão saiu do topo para reduzir ruído visual e continua disponível aqui.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+}
+
+class _AudioVideoSettingsSection extends StatelessWidget {
+  const _AudioVideoSettingsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SettingsSectionCard(
+      title: 'Áudio e Vídeo',
+      subtitle: 'Configurações locais de mídia do softphone.',
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.mic_none_outlined),
+          title: Text('Microfone'),
+          subtitle: Text('Usa o dispositivo padrão permitido pelo navegador.'),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.volume_up_outlined),
+          title: Text('Saída de áudio'),
+          subtitle: Text('Usa a saída padrão do sistema/navegador.'),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.videocam_outlined),
+          title: Text('Vídeo'),
+          subtitle: Text('Reservado para chamadas futuras com vídeo.'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DebugSettingsSection extends StatelessWidget {
+  const _DebugSettingsSection({required this.voip, required this.onChanged});
+
+  final PhoneWebVoipController voip;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final logText = voip.debugLogText();
+
+    return _SettingsSectionCard(
+      title: 'Debug',
+      subtitle: 'Diagnóstico local para SIP/WebRTC, mídia e ações da tela.',
+      children: [
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          value: voip.debugLoggingEnabled,
+          onChanged: (enabled) {
+            voip.setDebugLoggingEnabled(enabled);
+            onChanged();
+          },
+          title: const Text('Ativar debug detalhado'),
+          subtitle: const Text(
+            'Capture eventos SIP/WebRTC, mídia, registro e ações da tela para copiar e enviar para análise.',
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${voip.debugEvents.length} evento(s) capturado(s). O buffer mantém os últimos 600 eventos.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 260,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.55,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                logText,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            OutlinedButton.icon(
+              onPressed: () {
+                voip.clearDebugLog();
+                onChanged();
+              },
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('Limpar'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: logText));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Debug copiado')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy_outlined),
+              label: const Text('Copiar'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsSectionCard extends StatelessWidget {
+  const _SettingsSectionCard({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SingleChildScrollView(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.24),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...children,
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
