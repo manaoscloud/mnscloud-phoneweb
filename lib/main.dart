@@ -3046,7 +3046,6 @@ class CallHistoryTile extends StatelessWidget {
 
     final summary =
         '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}';
-    final diagnostic = entry.diagnostic.trim();
     final contact = existingContact;
     final hasContact = contact != null;
     final displayName = hasContact ? contact.name : entry.remoteIdentity;
@@ -3059,125 +3058,94 @@ class CallHistoryTile extends StatelessWidget {
         side: BorderSide(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: statusColor.withValues(alpha: 0.18),
-              foregroundColor: statusColor,
-              child: Icon(icon, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: statusColor.withValues(alpha: 0.18),
+                  foregroundColor: statusColor,
+                  child: Icon(icon, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                      Text(
+                        displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(height: 2),
                       Text(
-                        _formatShortTime(entry.startedAt),
+                        fullNumber,
+                        maxLines: 2,
+                        overflow: TextOverflow.visible,
+                        softWrap: true,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    fullNumber,
-                    maxLines: 2,
-                    overflow: TextOverflow.visible,
-                    softWrap: true,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (hasContact) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outlined,
-                          size: 14,
-                          color: colorScheme.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            'Contato salvo',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (diagnostic.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    SelectableText(
-                      diagnostic,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            Wrap(
-              spacing: 2,
-              children: [
-                IconButton(
-                  tooltip: hasContact
-                      ? 'Already saved as contact'
-                      : 'Add to contacts',
-                  onPressed: hasContact ? null : onAddContact,
-                  icon: Icon(
-                    hasContact
-                        ? Icons.how_to_reg_outlined
-                        : Icons.person_add_alt_1_outlined,
-                  ),
                 ),
-                IconButton(
-                  tooltip: 'Remove from history',
-                  onPressed: onRemove,
-                  icon: const Icon(Icons.delete_outline),
-                ),
-                IconButton.filledTonal(
-                  tooltip: 'Retornar ligação',
-                  onPressed: onDial,
-                  icon: const Icon(Icons.call_outlined),
+                const SizedBox(width: 8),
+                Text(
+                  _formatShortTime(entry.startedAt),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Wrap(
+                spacing: 2,
+                children: [
+                  IconButton(
+                    tooltip: hasContact
+                        ? 'Already saved as contact'
+                        : 'Add to contacts',
+                    onPressed: hasContact ? null : onAddContact,
+                    icon: Icon(
+                      hasContact
+                          ? Icons.how_to_reg_outlined
+                          : Icons.person_add_alt_1_outlined,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remove from history',
+                    onPressed: onRemove,
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+                  IconButton.filledTonal(
+                    tooltip: 'Retornar ligação',
+                    onPressed: onDial,
+                    icon: const Icon(Icons.call_outlined),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
