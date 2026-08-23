@@ -3059,90 +3059,109 @@ class CallHistoryTile extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: statusColor.withValues(alpha: 0.18),
-                  foregroundColor: statusColor,
-                  child: Icon(icon, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        displayName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        fullNumber,
-                        maxLines: 2,
-                        overflow: TextOverflow.visible,
-                        softWrap: true,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _formatShortTime(entry.startedAt),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: statusColor.withValues(alpha: 0.18),
+              foregroundColor: statusColor,
+              child: Icon(icon, size: 18),
             ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Wrap(
-                spacing: 2,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    tooltip: hasContact
-                        ? 'Already saved as contact'
-                        : 'Add to contacts',
-                    onPressed: hasContact ? null : onAddContact,
-                    icon: Icon(
-                      hasContact
-                          ? Icons.how_to_reg_outlined
-                          : Icons.person_add_alt_1_outlined,
+                  Text(
+                    displayName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Remove from history',
-                    onPressed: onRemove,
-                    icon: const Icon(Icons.delete_outline),
+                  const SizedBox(height: 2),
+                  Text(
+                    fullNumber,
+                    maxLines: 2,
+                    overflow: TextOverflow.visible,
+                    softWrap: true,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
-                  IconButton(
-                    tooltip: 'Retornar ligação',
-                    onPressed: onDial,
-                    icon: const Icon(Icons.call_outlined),
+                  const SizedBox(height: 2),
+                  Text(
+                    summary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 112),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatShortTime(entry.startedAt),
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 2,
+                    runSpacing: 0,
+                    children: [
+                      IconButton(
+                        constraints: const BoxConstraints.tightFor(
+                          width: 36,
+                          height: 36,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: hasContact
+                            ? 'Already saved as contact'
+                            : 'Add to contacts',
+                        onPressed: hasContact ? null : onAddContact,
+                        icon: Icon(
+                          hasContact
+                              ? Icons.how_to_reg_outlined
+                              : Icons.person_add_alt_1_outlined,
+                        ),
+                      ),
+                      IconButton(
+                        constraints: const BoxConstraints.tightFor(
+                          width: 36,
+                          height: 36,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Remove from history',
+                        onPressed: onRemove,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                      IconButton(
+                        constraints: const BoxConstraints.tightFor(
+                          width: 36,
+                          height: 36,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'Retornar ligação',
+                        onPressed: onDial,
+                        icon: const Icon(Icons.call_outlined),
+                      ),
+                    ],
                   ),
                 ],
               ),
