@@ -3049,6 +3049,8 @@ class CallHistoryTile extends StatelessWidget {
     final diagnostic = entry.diagnostic.trim();
     final contact = existingContact;
     final hasContact = contact != null;
+    final displayName = hasContact ? contact.name : entry.remoteIdentity;
+    final fullNumber = _dialableHistoryIdentity(entry.remoteIdentity);
 
     return Material(
       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
@@ -3077,7 +3079,7 @@ class CallHistoryTile extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          entry.remoteIdentity,
+                          displayName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
@@ -3092,6 +3094,17 @@ class CallHistoryTile extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    fullNumber,
+                    maxLines: 2,
+                    overflow: TextOverflow.visible,
+                    softWrap: true,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -3114,7 +3127,7 @@ class CallHistoryTile extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            contact.name,
+                            'Contato salvo',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall
