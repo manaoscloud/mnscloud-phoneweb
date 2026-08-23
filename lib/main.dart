@@ -3139,7 +3139,7 @@ class CallHistoryTile extends StatelessWidget {
                     onPressed: onRemove,
                     icon: const Icon(Icons.delete_outline),
                   ),
-                  IconButton.filledTonal(
+                  IconButton(
                     tooltip: 'Retornar ligação',
                     onPressed: onDial,
                     icon: const Icon(Icons.call_outlined),
