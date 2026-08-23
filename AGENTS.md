@@ -32,6 +32,22 @@ public-facing text must be written in English.
   without a separate design and licensing review.
 - Do not make push notifications a hard requirement for manual foreground use.
 
+## Multiplatform UI and behavior contract
+
+- Every PhoneWeb functional or visual change must be implemented and validated
+  across desktop, mobile responsive web, and installed PWA layouts.
+- Desktop-only changes are not complete unless the same capability is available
+  on mobile/PWA or the limitation is explicitly documented before delivery.
+- Mobile/PWA must expose the same account, registration diagnostic, call,
+  hangup, debug, contact, history, message, version, and settings controls as
+  desktop, adapted only for layout density and platform constraints.
+- When a feature depends on platform APIs, keep the shared behavior consistent
+  and isolate platform-specific differences behind adapters or documented
+  fallbacks.
+- Before marking a PhoneWeb UI change complete, validate at least one desktop
+  width and one mobile/PWA-width layout for visibility, scrolling, tap targets,
+  and action parity.
+
 ## Security Boundary
 
 Never commit secrets, tokens, customer data, provider credentials, production
@@ -53,4 +69,3 @@ flutter test
 
 If Flutter is not available in the environment, document that clearly in the
 Pull Request validation section.
-

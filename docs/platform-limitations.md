@@ -3,6 +3,19 @@
 PhoneWeb is Flutter-based and targets Android, iOS, Web, Windows, macOS, and
 Linux. WebRTC behavior is not identical across platforms.
 
+## Multiplatform product contract
+
+PhoneWeb features must be designed as multiplatform capabilities first.
+Desktop, mobile responsive web, and installed PWA should expose the same core
+actions and diagnostics, including account management, registration status,
+call controls, hangup behavior, debug logs, contacts, call history, messages,
+version/update information, and settings.
+
+Layout may change by viewport, but behavior must not silently disappear on a
+platform. If a platform API or browser/OS policy prevents equivalent behavior,
+the limitation and fallback must be documented here before the change is
+considered complete.
+
 ## Android
 
 Expected MVP behavior:

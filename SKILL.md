@@ -35,6 +35,22 @@ traditional SIP transports.
 - Traditional SIP engines must be optional future packages, not hardwired into
   the WebRTC app.
 
+## Multiplatform Change Contract
+
+- Treat PhoneWeb as one multiplatform product. A desktop improvement must also
+  be applied to mobile responsive web and installed PWA, and a mobile
+  improvement must also be considered for desktop.
+- Do not deliver desktop-only controls, diagnostics, status indicators, contact
+  tools, history actions, call actions, message features, version indicators, or
+  settings unless a documented platform limitation blocks parity.
+- Preserve the same behavior and troubleshooting information across layouts;
+  only the placement, density, scrolling, and navigation pattern may differ.
+- Validate changed screens in both desktop and mobile/PWA breakpoints before
+  completion. Check that all primary actions remain reachable, translated, and
+  usable with touch targets on narrow screens.
+- If a platform-specific API prevents parity, document the exact limitation and
+  fallback in `docs/platform-limitations.md` in the same change.
+
 ## Validation
 
 ```bash
@@ -51,4 +67,3 @@ available formatting or lint checks.
 After completed changes, validate, commit, and push to the GitHub remote. If a
 change spans the workspace registry or documentation, commit and push those
 changes separately in the root workspace repository.
-
