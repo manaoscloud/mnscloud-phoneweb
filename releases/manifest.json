@@ -3,9 +3,9 @@
   "repository": "manaoscloud/mnscloud-phoneweb",
   "channels": {
     "stable": {
-      "version": "0.1.44",
-      "ref": "v0.1.44",
-      "releasedAt": "2026-08-23T14:38:02Z",
+      "version": "0.1.45",
+      "ref": "v0.1.45",
+      "releasedAt": "2026-08-23T14:47:57Z",
       "minimumVersion": "0.1.0"
     }
   }
