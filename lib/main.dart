@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sip_ua/sip_ua.dart';
@@ -27,9 +29,23 @@ class PhoneWebApp extends StatelessWidget {
       theme: _phoneWebTheme(Brightness.light),
       darkTheme: _phoneWebTheme(Brightness.dark),
       themeMode: ThemeMode.system,
+      scrollBehavior: const PhoneWebScrollBehavior(),
       home: const PhoneWebHomePage(),
     );
   }
+}
+
+class PhoneWebScrollBehavior extends MaterialScrollBehavior {
+  const PhoneWebScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+    PointerDeviceKind.trackpad,
+  };
 }
 
 ThemeData _phoneWebTheme(Brightness brightness) {
@@ -156,6 +172,13 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           : '${_contacts.length} contato(s) local(is) salvo(s)';
     });
 
+    final selectedAccountId = _selectedAccountId;
+    if (selectedAccountId != null &&
+        _accounts.where((account) => account.enabled).length > 1) {
+      setState(() => _enforceSingleActiveAccount(selectedAccountId));
+      await _saveStandaloneAccounts();
+    }
+
     final account = _selectedAccount;
     if (account != null && account.enabled && account.autoRegister) {
       await _voip.register(account);
@@ -200,6 +223,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         _selectedAccountId = result.id;
         _lastEvent = '${result.name} added';
       }
+      if (result.enabled) {
+        _enforceSingleActiveAccount(result.id);
+      }
     });
     await _saveStandaloneAccounts();
 
@@ -222,11 +248,38 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   Future<void> _toggleRegistration(WebRtcAccount account) async {
     if (account.status == RegistrationStatus.registered ||
         account.status == RegistrationStatus.registering) {
+      setState(() {
+        final index = _accounts.indexWhere((item) => item.id == account.id);
+        if (index >= 0) {
+          _accounts[index] = _accounts[index].copyWith(enabled: false);
+        }
+      });
+      await _saveStandaloneAccounts();
       await _voip.unregister();
       return;
     }
 
+    setState(() {
+      _selectedAccountId = account.id;
+      _enforceSingleActiveAccount(account.id);
+    });
+    await _saveStandaloneAccounts();
     await _voip.register(account);
+  }
+
+  void _enforceSingleActiveAccount(String activeAccountId) {
+    for (var index = 0; index < _accounts.length; index += 1) {
+      final account = _accounts[index];
+      if (account.id == activeAccountId) {
+        _accounts[index] = account.copyWith(enabled: true);
+        continue;
+      }
+      _accounts[index] = account.copyWith(
+        enabled: false,
+        status: RegistrationStatus.offline,
+        diagnostic: RegistrationDiagnostic.stopped(),
+      );
+    }
   }
 
   void _syncVoipState() {
@@ -453,6 +506,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     final compact = MediaQuery.sizeOf(context).width < 720;
     final settings = PhoneWebSettingsDialog(
       voip: _voip,
+      accounts: _accounts,
       runtimeVersion: _runtimeVersion,
       onRefreshVersion: _refreshRuntimeVersion,
     );
@@ -2112,12 +2166,14 @@ enum PhoneWebSettingsSection { interface, audioVideo, debug }
 class PhoneWebSettingsDialog extends StatefulWidget {
   const PhoneWebSettingsDialog({
     required this.voip,
+    required this.accounts,
     required this.runtimeVersion,
     required this.onRefreshVersion,
     super.key,
   });
 
   final PhoneWebVoipController voip;
+  final List<WebRtcAccount> accounts;
   final RuntimeVersionInfo runtimeVersion;
   final VoidCallback onRefreshVersion;
 
@@ -2260,6 +2316,7 @@ class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
       PhoneWebSettingsSection.audioVideo => const _AudioVideoSettingsSection(),
       PhoneWebSettingsSection.debug => _DebugSettingsSection(
         voip: widget.voip,
+        accounts: widget.accounts,
         onChanged: () => setState(() {}),
       ),
     };
@@ -2427,15 +2484,20 @@ class _AudioVideoSettingsSection extends StatelessWidget {
 }
 
 class _DebugSettingsSection extends StatelessWidget {
-  const _DebugSettingsSection({required this.voip, required this.onChanged});
+  const _DebugSettingsSection({
+    required this.voip,
+    required this.accounts,
+    required this.onChanged,
+  });
 
   final PhoneWebVoipController voip;
+  final List<WebRtcAccount> accounts;
   final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final logText = voip.debugLogText();
+    final logText = voip.debugLogText(accounts: accounts);
 
     return _SettingsSectionCard(
       title: 'Debug',

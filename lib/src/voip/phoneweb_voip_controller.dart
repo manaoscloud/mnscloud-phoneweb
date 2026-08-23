@@ -39,6 +39,7 @@ class PhoneWebVoipController extends ChangeNotifier
   bool _onHold = false;
   bool _started = false;
   bool _manualStopRequested = false;
+  bool _activeCallHasRemoteStream = false;
   Future<void>? _registerInFlight;
   String? _activeAccountKey;
   final List<PhoneWebDebugEvent> _debugEvents = <PhoneWebDebugEvent>[];
@@ -292,7 +293,18 @@ class PhoneWebVoipController extends ChangeNotifier
     _cancelAnswerConfirmationTimer();
     _stopRingtone();
     _guardTerminatedCall(call);
-    call.hangup();
+    try {
+      call.hangup();
+      _debug('call.hangup.sent', _callDebugData(call));
+    } catch (error, stack) {
+      _debug('call.hangup.error', {
+        ..._callDebugData(call),
+        'error': error.toString(),
+        'stack': stack.toString().split('\n').take(8).join(' | '),
+      });
+      _lastCallDiagnostic =
+          'PhoneWeb requested hangup, but the SIP/WebRTC stack returned an error while sending BYE: $error';
+    }
     _clearActiveCall(CallStateEnum.ENDED);
     _setEvent('Call ended');
     notifyListeners();
@@ -512,6 +524,7 @@ class PhoneWebVoipController extends ChangeNotifier
             ..._callDebugData(call),
             'confirmed': _isCallConfirmed(call),
           });
+          _activeCallHasRemoteStream = true;
           _stopRingtone();
           _stopRingback();
           _attachRemoteStream(state.stream!);
@@ -767,6 +780,7 @@ class PhoneWebVoipController extends ChangeNotifier
     _callState = state;
     _muted = false;
     _onHold = false;
+    _activeCallHasRemoteStream = false;
   }
 
   void _startCallDuration() {
@@ -795,9 +809,15 @@ class PhoneWebVoipController extends ChangeNotifier
           'The call answer was requested, but the SIP dialog was not confirmed. '
           'No confirmed 200 OK/ACK exchange was observed before the timeout.';
       _setEvent('Call answer was not confirmed');
-      _guardTerminatedCall(call);
-      call.hangup({'status_code': 408, 'reason_phrase': 'ACK Timeout'});
-      _clearActiveCall(CallStateEnum.FAILED);
+      _debug('call.answer.confirmation_timeout', {
+        ..._callDebugData(call),
+        'hasRemoteStream': _activeCallHasRemoteStream,
+      });
+      if (!_activeCallHasRemoteStream) {
+        _guardTerminatedCall(call);
+        call.hangup({'status_code': 408, 'reason_phrase': 'ACK Timeout'});
+        _clearActiveCall(CallStateEnum.FAILED);
+      }
       notifyListeners();
     });
   }
@@ -922,12 +942,33 @@ class PhoneWebVoipController extends ChangeNotifier
     notifyListeners();
   }
 
-  String debugLogText() {
+  String debugLogText({List<WebRtcAccount> accounts = const []}) {
     final account = _account;
+    final accountLines = accounts.isEmpty
+        ? <String>['- no saved accounts reported by UI']
+        : accounts.map((savedAccount) {
+            final isRuntimeAccount =
+                account != null &&
+                _accountKey(savedAccount) == _accountKey(account);
+            final diagnostic = savedAccount.diagnostic?.summary ?? '-';
+            return [
+              '- ${savedAccount.name.isEmpty ? savedAccount.username : savedAccount.name}',
+              'id=${savedAccount.id}',
+              'sip=${savedAccount.username}@${savedAccount.domain}',
+              'wss=${savedAccount.wssServer}',
+              'enabled=${savedAccount.enabled}',
+              'autoRegister=${savedAccount.autoRegister}',
+              'status=${savedAccount.status.name}',
+              'activeRuntime=${isRuntimeAccount ? 'yes' : 'no'}',
+              'diagnostic=$diagnostic',
+            ].join(' ');
+          }).toList();
     final header = <String>[
       'MNSCloud PhoneWeb debug log',
       'Generated at: ${DateTime.now().toIso8601String()}',
       'Debug enabled: $_debugLoggingEnabled',
+      'Saved accounts: ${accounts.length}',
+      'Active runtime account: ${account?.name ?? '-'}',
       'Account: ${account?.name ?? '-'}',
       'SIP user: ${account == null ? '-' : '${account.username}@${account.domain}'}',
       'WSS: ${account?.wssServer ?? '-'}',
@@ -939,6 +980,8 @@ class PhoneWebVoipController extends ChangeNotifier
       'Remote identity: $remoteIdentity',
       'Last event: $_lastEvent',
       'Last call diagnostic: ${_lastCallDiagnostic.isEmpty ? '-' : _lastCallDiagnostic}',
+      '---- saved accounts ----',
+      ...accountLines,
       '---- events ----',
     ];
     return [

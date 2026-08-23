@@ -848,34 +848,40 @@ class RTCSession extends EventManager implements Owner {
         if (_state == RtcSessionState.waitingForAck &&
             _direction == Direction.incoming &&
             _request.server_transaction.state != TransactionState.TERMINATED) {
+          if (_dialog == null) {
+            _createDialog(_request, 'UAS');
+          }
+
+          if (_dialog == null) {
+            logger.w(
+                'terminate() | incoming waitingForAck has no dialog; ending locally');
+
+            await _logCallStat();
+
+            _ended(
+                Originator.local,
+                null,
+                ErrorCause(
+                  cause: cause as String?,
+                  status_code: status_code,
+                  reason_phrase: reason_phrase,
+                ));
+            break;
+          }
+
           /// Save the dialog for later restoration.
           Dialog dialog = _dialog!;
 
-          // Send the BYE as soon as the ACK is received...
-          receiveRequest = (IncomingMessage request) {
-            if (request.method == SipMethod.ACK) {
-              sendRequest(
-                SipMethod.BYE,
-                <String, dynamic>{'extraHeaders': extraHeaders, 'body': body},
-              );
-              dialog.terminate();
-            }
-          };
+          // In WebRTC/browser flows the ACK can already have been forwarded by
+          // the edge while the SDK still has not emitted the confirmed event.
+          // Do not leave the upstream call alive indefinitely when the user
+          // explicitly hangs up from the UI.
+          sendRequest(
+            SipMethod.BYE,
+            <String, dynamic>{'extraHeaders': extraHeaders, 'body': body},
+          );
+          dialog.terminate();
 
-          // .., or when the INVITE transaction times out
-          _request.server_transaction.on(EventStateChanged(),
-              (EventStateChanged state) {
-            if (_request.server_transaction.state ==
-                TransactionState.TERMINATED) {
-              sendRequest(SipMethod.BYE, <String, dynamic>{
-                'extraHeaders': extraHeaders,
-                'body': body
-              });
-              dialog.terminate();
-            }
-          });
-
-          //write call statistics to the log
           await _logCallStat();
 
           _ended(
@@ -886,12 +892,7 @@ class RTCSession extends EventManager implements Owner {
                 status_code: status_code,
                 reason_phrase: reason_phrase,
               ));
-
-          // Restore the dialog into 'this' in order to be able to send the in-dialog BYE :-).
-          _dialog = dialog;
-
-          // Restore the dialog into 'ua' so the ACK can reach 'this' session.
-          _ua.newDialog(dialog);
+          break;
         } else {
           sendRequest(SipMethod.BYE,
               <String, dynamic>{'extraHeaders': extraHeaders, 'body': body});
@@ -1320,6 +1321,19 @@ class RTCSession extends EventManager implements Owner {
   OutgoingRequest sendRequest(SipMethod method,
       [Map<String, dynamic>? options]) {
     logger.d('sendRequest()');
+
+    if (_dialog == null && _direction == Direction.incoming) {
+      _debugCall('dialog.recreate_for_send_request.start', {
+        'method': method.name,
+        'state': _state.name,
+      });
+      _createDialog(_request, 'UAS');
+      _debugCall('dialog.recreate_for_send_request.done', {
+        'method': method.name,
+        'state': _state.name,
+        'hasDialog': _dialog != null,
+      });
+    }
 
     return _dialog!.sendRequest(method, options);
   }
