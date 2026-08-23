@@ -345,10 +345,18 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     await _voip.makeCall(_dialNumber);
   }
 
-  Future<void> _openContactDialog({PhoneContact? contact}) async {
+  Future<void> _openContactDialog({
+    PhoneContact? contact,
+    String initialName = '',
+    String initialNumber = '',
+  }) async {
     final result = await showDialog<PhoneContact>(
       context: context,
-      builder: (context) => ContactDialog(contact: contact),
+      builder: (context) => ContactDialog(
+        contact: contact,
+        initialName: initialName,
+        initialNumber: initialNumber,
+      ),
     );
     if (result == null) return;
 
@@ -364,6 +372,15 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     await _saveStandaloneContacts();
   }
 
+  Future<void> _addHistoryEntryToContacts(PhoneCallHistoryEntry entry) async {
+    final number = _dialableHistoryIdentity(entry.remoteIdentity);
+    if (number.isEmpty || _contactForHistoryEntry(entry) != null) {
+      return;
+    }
+
+    await _openContactDialog(initialName: number, initialNumber: number);
+  }
+
   void _dialContact(PhoneContact contact) {
     setState(() {
       _dialNumber = contact.number;
@@ -376,6 +393,60 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       _dialNumber = _dialableHistoryIdentity(entry.remoteIdentity);
       _mobileTabIndex = 0;
     });
+  }
+
+  Future<void> _removeHistoryEntry(PhoneCallHistoryEntry entry) async {
+    setState(() {
+      _callHistory.removeWhere((item) => item.id == entry.id);
+      _lastEvent = 'Call history entry removed';
+    });
+    await _saveStandaloneHistory();
+  }
+
+  Future<void> _clearCallHistory() async {
+    if (_callHistory.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear call history?'),
+        content: Text(
+          'This will remove ${_callHistory.length} local call history entr${_callHistory.length == 1 ? 'y' : 'ies'} from this device.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_sweep_outlined),
+            label: const Text('Clear history'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() {
+      _callHistory.clear();
+      _lastEvent = 'Call history cleared';
+    });
+    await _saveStandaloneHistory();
+  }
+
+  PhoneContact? _contactForHistoryEntry(PhoneCallHistoryEntry entry) {
+    final entryNumber = _normalizePhoneNumber(
+      _dialableHistoryIdentity(entry.remoteIdentity),
+    );
+    if (entryNumber.isEmpty) return null;
+
+    for (final contact in _contacts) {
+      if (_normalizePhoneNumber(contact.number) == entryNumber) {
+        return contact;
+      }
+    }
+    return null;
   }
 
   Future<void> _openDebugDialog() async {
@@ -455,6 +526,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onEditContact: (contact) => _openContactDialog(contact: contact),
         onDialContact: _dialContact,
         onDialHistoryEntry: _dialHistoryEntry,
+        onAddHistoryContact: _addHistoryEntryToContacts,
+        onRemoveHistoryEntry: _removeHistoryEntry,
+        onClearCallHistory: _clearCallHistory,
+        contactForHistoryEntry: _contactForHistoryEntry,
         onSyncContacts: _syncNativeContacts,
         contactsSyncing: _contactsSyncing,
         contactsStatus: _contactsStatus,
@@ -539,6 +614,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                               onCall: _makeCall,
                               callHistory: _callHistory,
                               onDialHistoryEntry: _dialHistoryEntry,
+                              onAddHistoryContact: _addHistoryEntryToContacts,
+                              onRemoveHistoryEntry: _removeHistoryEntry,
+                              onClearCallHistory: _clearCallHistory,
+                              contactForHistoryEntry: _contactForHistoryEntry,
                             ),
                           ),
                         ],
@@ -588,7 +667,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onCall: _makeCall,
       ),
       const SizedBox(height: 16),
-      CallHistoryPanel(entries: _callHistory, onDial: _dialHistoryEntry),
+      CallHistoryPanel(
+        entries: _callHistory,
+        onDial: _dialHistoryEntry,
+        onAddContact: _addHistoryEntryToContacts,
+        onRemove: _removeHistoryEntry,
+        onClearAll: _clearCallHistory,
+        contactForEntry: _contactForHistoryEntry,
+      ),
       const SizedBox(height: 16),
       const MessagesPanel(),
     ];
@@ -606,6 +692,10 @@ class WorkspacePanels extends StatelessWidget {
     required this.onCall,
     required this.callHistory,
     required this.onDialHistoryEntry,
+    required this.onAddHistoryContact,
+    required this.onRemoveHistoryEntry,
+    required this.onClearCallHistory,
+    required this.contactForHistoryEntry,
     super.key,
   });
 
@@ -618,6 +708,11 @@ class WorkspacePanels extends StatelessWidget {
   final VoidCallback onClear;
   final VoidCallback onCall;
   final ValueChanged<PhoneCallHistoryEntry> onDialHistoryEntry;
+  final ValueChanged<PhoneCallHistoryEntry> onAddHistoryContact;
+  final ValueChanged<PhoneCallHistoryEntry> onRemoveHistoryEntry;
+  final VoidCallback onClearCallHistory;
+  final PhoneContact? Function(PhoneCallHistoryEntry entry)
+  contactForHistoryEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -646,7 +741,11 @@ class WorkspacePanels extends StatelessWidget {
                     Expanded(
                       child: CallHistoryPanel(
                         entries: callHistory,
+                        contactForEntry: contactForHistoryEntry,
                         onDial: onDialHistoryEntry,
+                        onAddContact: onAddHistoryContact,
+                        onRemove: onRemoveHistoryEntry,
+                        onClearAll: onClearCallHistory,
                         useInternalScroll: true,
                       ),
                     ),
@@ -674,7 +773,14 @@ class WorkspacePanels extends StatelessWidget {
               onCall: onCall,
             ),
             const SizedBox(height: 16),
-            CallHistoryPanel(entries: callHistory, onDial: onDialHistoryEntry),
+            CallHistoryPanel(
+              entries: callHistory,
+              contactForEntry: contactForHistoryEntry,
+              onDial: onDialHistoryEntry,
+              onAddContact: onAddHistoryContact,
+              onRemove: onRemoveHistoryEntry,
+              onClearAll: onClearCallHistory,
+            ),
             const SizedBox(height: 16),
             MessagesPanel(),
           ],
@@ -709,6 +815,10 @@ class MobilePhoneShell extends StatelessWidget {
     required this.onEditContact,
     required this.onDialContact,
     required this.onDialHistoryEntry,
+    required this.onAddHistoryContact,
+    required this.onRemoveHistoryEntry,
+    required this.onClearCallHistory,
+    required this.contactForHistoryEntry,
     required this.onSyncContacts,
     required this.contactsSyncing,
     required this.contactsStatus,
@@ -738,6 +848,11 @@ class MobilePhoneShell extends StatelessWidget {
   final ValueChanged<PhoneContact> onEditContact;
   final ValueChanged<PhoneContact> onDialContact;
   final ValueChanged<PhoneCallHistoryEntry> onDialHistoryEntry;
+  final ValueChanged<PhoneCallHistoryEntry> onAddHistoryContact;
+  final ValueChanged<PhoneCallHistoryEntry> onRemoveHistoryEntry;
+  final VoidCallback onClearCallHistory;
+  final PhoneContact? Function(PhoneCallHistoryEntry entry)
+  contactForHistoryEntry;
   final VoidCallback onSyncContacts;
   final bool contactsSyncing;
   final String contactsStatus;
@@ -766,7 +881,14 @@ class MobilePhoneShell extends StatelessWidget {
         contactsSyncing: contactsSyncing,
         contactsStatus: contactsStatus,
       ),
-      MobileHistoryView(entries: callHistory, onDial: onDialHistoryEntry),
+      MobileHistoryView(
+        entries: callHistory,
+        onDial: onDialHistoryEntry,
+        onAddContact: onAddHistoryContact,
+        onRemove: onRemoveHistoryEntry,
+        onClearAll: onClearCallHistory,
+        contactForEntry: contactForHistoryEntry,
+      ),
       MobileMessagesView(),
     ];
 
@@ -1674,11 +1796,19 @@ class MobileHistoryView extends StatefulWidget {
   const MobileHistoryView({
     required this.entries,
     required this.onDial,
+    required this.onAddContact,
+    required this.onRemove,
+    required this.onClearAll,
+    required this.contactForEntry,
     super.key,
   });
 
   final List<PhoneCallHistoryEntry> entries;
   final ValueChanged<PhoneCallHistoryEntry> onDial;
+  final ValueChanged<PhoneCallHistoryEntry> onAddContact;
+  final ValueChanged<PhoneCallHistoryEntry> onRemove;
+  final VoidCallback onClearAll;
+  final PhoneContact? Function(PhoneCallHistoryEntry entry) contactForEntry;
 
   @override
   State<MobileHistoryView> createState() => _MobileHistoryViewState();
@@ -1705,6 +1835,23 @@ class _MobileHistoryViewState extends State<MobileHistoryView> {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
       child: Column(
         children: [
+          Row(
+            children: [
+              Text(
+                'Histórico',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: widget.entries.isEmpty ? null : widget.onClearAll,
+                tooltip: 'Limpar histórico',
+                icon: const Icon(Icons.delete_sweep_outlined),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
             hintText: 'Buscar histórico',
@@ -1732,7 +1879,10 @@ class _MobileHistoryViewState extends State<MobileHistoryView> {
                       final entry = filteredEntries[index];
                       return CallHistoryTile(
                         entry: entry,
+                        existingContact: widget.contactForEntry(entry),
                         onDial: () => widget.onDial(entry),
+                        onAddContact: () => widget.onAddContact(entry),
+                        onRemove: () => widget.onRemove(entry),
                       );
                     },
                   ),
@@ -2756,13 +2906,21 @@ class ActiveCallControls extends StatelessWidget {
 class CallHistoryPanel extends StatefulWidget {
   const CallHistoryPanel({
     required this.entries,
+    this.contactForEntry,
     this.onDial,
+    this.onAddContact,
+    this.onRemove,
+    this.onClearAll,
     this.useInternalScroll = false,
     super.key,
   });
 
   final List<PhoneCallHistoryEntry> entries;
+  final PhoneContact? Function(PhoneCallHistoryEntry entry)? contactForEntry;
   final ValueChanged<PhoneCallHistoryEntry>? onDial;
+  final ValueChanged<PhoneCallHistoryEntry>? onAddContact;
+  final ValueChanged<PhoneCallHistoryEntry>? onRemove;
+  final VoidCallback? onClearAll;
   final bool useInternalScroll;
 
   @override
@@ -2804,9 +2962,16 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
             padding: const EdgeInsets.only(bottom: 8),
             child: CallHistoryTile(
               entry: entry,
+              existingContact: widget.contactForEntry?.call(entry),
               onDial: widget.onDial == null
                   ? null
                   : () => widget.onDial!(entry),
+              onAddContact: widget.onAddContact == null
+                  ? null
+                  : () => widget.onAddContact!(entry),
+              onRemove: widget.onRemove == null
+                  ? null
+                  : () => widget.onRemove!(entry),
             ),
           ),
         ),
@@ -2816,7 +2981,18 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PanelTitle(icon: Icons.history, title: 'Call history'),
+          Row(
+            children: [
+              const Expanded(
+                child: PanelTitle(icon: Icons.history, title: 'Call history'),
+              ),
+              IconButton(
+                onPressed: widget.entries.isEmpty ? null : widget.onClearAll,
+                tooltip: 'Clear all call history',
+                icon: const Icon(Icons.delete_sweep_outlined),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
@@ -2835,10 +3011,20 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
 }
 
 class CallHistoryTile extends StatelessWidget {
-  const CallHistoryTile({required this.entry, this.onDial, super.key});
+  const CallHistoryTile({
+    required this.entry,
+    this.existingContact,
+    this.onDial,
+    this.onAddContact,
+    this.onRemove,
+    super.key,
+  });
 
   final PhoneCallHistoryEntry entry;
+  final PhoneContact? existingContact;
   final VoidCallback? onDial;
+  final VoidCallback? onAddContact;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -2861,6 +3047,8 @@ class CallHistoryTile extends StatelessWidget {
     final summary =
         '$statusLabel · ${_formatCallDurationSeconds(entry.durationSeconds)}';
     final diagnostic = entry.diagnostic.trim();
+    final contact = existingContact;
+    final hasContact = contact != null;
 
     return Material(
       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
@@ -2914,6 +3102,31 @@ class CallHistoryTile extends StatelessWidget {
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (hasContact) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_outlined,
+                          size: 14,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            contact.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: colorScheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (diagnostic.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     SelectableText(
@@ -2927,10 +3140,31 @@ class CallHistoryTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            IconButton.filledTonal(
-              tooltip: 'Retornar ligação',
-              onPressed: onDial,
-              icon: const Icon(Icons.call_outlined),
+            Wrap(
+              spacing: 2,
+              children: [
+                IconButton(
+                  tooltip: hasContact
+                      ? 'Already saved as contact'
+                      : 'Add to contacts',
+                  onPressed: hasContact ? null : onAddContact,
+                  icon: Icon(
+                    hasContact
+                        ? Icons.how_to_reg_outlined
+                        : Icons.person_add_alt_1_outlined,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove from history',
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+                IconButton.filledTonal(
+                  tooltip: 'Retornar ligação',
+                  onPressed: onDial,
+                  icon: const Icon(Icons.call_outlined),
+                ),
+              ],
             ),
           ],
         ),
@@ -3021,6 +3255,13 @@ String _dialableHistoryIdentity(String value) {
     return withoutScheme.split('@').first;
   }
   return trimmed.split('@').first;
+}
+
+String _normalizePhoneNumber(String value) {
+  final dialable = _dialableHistoryIdentity(value);
+  final digits = dialable.replaceAll(RegExp(r'\D'), '');
+  if (digits.isNotEmpty) return digits;
+  return dialable.trim().toLowerCase();
 }
 
 bool _matchesAccount(WebRtcAccount account, String query) {
@@ -3278,9 +3519,16 @@ class _PanelScrollableContent extends StatelessWidget {
 }
 
 class ContactDialog extends StatefulWidget {
-  const ContactDialog({this.contact, super.key});
+  const ContactDialog({
+    this.contact,
+    this.initialName = '',
+    this.initialNumber = '',
+    super.key,
+  });
 
   final PhoneContact? contact;
+  final String initialName;
+  final String initialNumber;
 
   @override
   State<ContactDialog> createState() => _ContactDialogState();
@@ -3296,8 +3544,12 @@ class _ContactDialogState extends State<ContactDialog> {
   void initState() {
     super.initState();
     final contact = widget.contact;
-    _nameController = TextEditingController(text: contact?.name ?? '');
-    _numberController = TextEditingController(text: contact?.number ?? '');
+    _nameController = TextEditingController(
+      text: contact?.name ?? widget.initialName,
+    );
+    _numberController = TextEditingController(
+      text: contact?.number ?? widget.initialNumber,
+    );
     _companyController = TextEditingController(text: contact?.company ?? '');
   }
 
