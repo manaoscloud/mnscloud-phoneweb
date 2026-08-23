@@ -2698,15 +2698,19 @@ class DialerPanel extends StatelessWidget {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      SizedBox(
-                        height: 48,
-                        child: OutlinedButton(
-                          onPressed: () => onAppend('*97'),
-                          child: const Icon(Icons.voicemail),
+                      Expanded(
+                        flex: 1,
+                        child: SizedBox(
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: () => onAppend('*97'),
+                            child: const Icon(Icons.voicemail),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
+                        flex: 2,
                         child: SizedBox(
                           height: 48,
                           child: FilledButton.icon(
