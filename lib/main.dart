@@ -2359,8 +2359,6 @@ class _InterfaceSettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return _SettingsSectionCard(
       title: 'Interface',
       subtitle: 'Preferências visuais do PhoneWeb.',
@@ -2390,13 +2388,6 @@ class _InterfaceSettingsSection extends StatelessWidget {
             ),
             VersionBadge(versionInfo: versionInfo, onRefresh: onRefreshVersion),
           ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'O badge de versão saiu do topo para reduzir ruído visual e continua disponível aqui.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
       ],
     );
