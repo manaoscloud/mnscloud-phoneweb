@@ -55,6 +55,7 @@ class PhoneWebVoipController extends ChangeNotifier
   List<PhoneWebDebugEvent> get debugEvents => List.unmodifiable(_debugEvents);
   bool get muted => _muted;
   bool get onHold => _onHold;
+  bool get holdSupported => false;
   Duration get callDuration => _callDuration;
   bool get isRegistered => _helper.registered;
   bool get hasActiveCall => _activeCall != null;
@@ -325,11 +326,11 @@ class PhoneWebVoipController extends ChangeNotifier
     final call = _activeCall;
     if (call == null) return;
 
-    if (_onHold) {
-      call.unhold();
-    } else {
-      call.hold();
-    }
+    _debug('call.hold.unsupported', _callDebugData(call));
+    _lastCallDiagnostic =
+        'Hold is temporarily disabled because SIP re-INVITE hold/resume is not validated for this WebRTC edge flow yet.';
+    _setEvent('Hold is not available for this call');
+    notifyListeners();
   }
 
   void sendDtmf(String tone) {

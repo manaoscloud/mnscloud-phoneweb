@@ -3300,7 +3300,7 @@ class ActiveCallControls extends StatelessWidget {
                   label: Text(voip.muted ? 'Unmute' : 'Mute'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: voip.toggleHold,
+                  onPressed: voip.holdSupported ? voip.toggleHold : null,
                   icon: Icon(voip.onHold ? Icons.play_arrow : Icons.pause),
                   label: Text(voip.onHold ? 'Resume' : 'Hold'),
                 ),
