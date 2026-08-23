@@ -450,14 +450,25 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   Future<void> _openSettingsDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) => PhoneWebSettingsDialog(
-        voip: _voip,
-        runtimeVersion: _runtimeVersion,
-        onRefreshVersion: _refreshRuntimeVersion,
-      ),
+    final compact = MediaQuery.sizeOf(context).width < 720;
+    final settings = PhoneWebSettingsDialog(
+      voip: _voip,
+      runtimeVersion: _runtimeVersion,
+      onRefreshVersion: _refreshRuntimeVersion,
     );
+
+    if (compact) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => settings,
+      );
+      return;
+    }
+
+    await showDialog<void>(context: context, builder: (context) => settings);
   }
 
   Future<void> _syncNativeContacts() async {
@@ -2122,6 +2133,76 @@ class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
     final colorScheme = Theme.of(context).colorScheme;
     final compact = MediaQuery.sizeOf(context).width < 720;
 
+    if (compact) {
+      return DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.62,
+        maxChildSize: 0.96,
+        expand: false,
+        builder: (context, scrollController) {
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+              child: Column(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.38,
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        'Settings',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Fechar',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        _SettingsSectionSelector(
+                          selected: _section,
+                          onSelected: (section) =>
+                              setState(() => _section = section),
+                          compact: true,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildSelectedSection(colorScheme),
+                        const SizedBox(height: 18),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return AlertDialog(
       title: const Text('Settings'),
       content: SizedBox(
@@ -2209,17 +2290,38 @@ class _SettingsSectionSelector extends StatelessWidget {
     ];
 
     if (compact) {
-      return SegmentedButton<PhoneWebSettingsSection>(
-        segments: [
+      return Column(
+        children: [
           for (final item in items)
-            ButtonSegment(
-              value: item.$1,
-              icon: Icon(item.$2),
-              label: Text(item.$3),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                dense: true,
+                selected: selected == item.$1,
+                selectedTileColor: Theme.of(
+                  context,
+                ).colorScheme.secondaryContainer.withValues(alpha: 0.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(
+                    color: selected == item.$1
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                leading: Icon(item.$2),
+                title: Text(
+                  item.$3,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: selected == item.$1
+                    ? const Icon(Icons.check_circle_outline)
+                    : null,
+                onTap: () => onSelected(item.$1),
+              ),
             ),
         ],
-        selected: {selected},
-        onSelectionChanged: (selection) => onSelected(selection.first),
       );
     }
 
@@ -2435,6 +2537,7 @@ class _SettingsSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final compact = MediaQuery.sizeOf(context).width < 720;
     return SingleChildScrollView(
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -2443,7 +2546,7 @@ class _SettingsSectionCard extends StatelessWidget {
           border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(compact ? 14 : 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
