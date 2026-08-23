@@ -586,14 +586,22 @@ class Call {
 
   void hangup([Map<String, dynamic>? options]) {
     assert(_session != null, 'ERROR(hangup): rtc session is invalid!');
+    if (state != CallStateEnum.ENDED) {
+      _session.terminate(options);
+    }
+
     if (peerConnection != null) {
       for (MediaStream? stream in peerConnection!.getLocalStreams()) {
         if (stream == null) continue;
         logger.d(
             'Stopping local stream with tracks: ${stream.getTracks().length}');
         for (MediaStreamTrack track in stream.getTracks()) {
-          logger.d('Stopping track: ${track.kind}${track.id} ');
-          track.stop();
+          try {
+            logger.d('Stopping local ${track.kind} track');
+            track.stop();
+          } catch (error) {
+            logger.w('Failed to stop local track after hangup: $error');
+          }
         }
       }
       for (MediaStream? stream in peerConnection!.getRemoteStreams()) {
@@ -601,16 +609,17 @@ class Call {
         logger.d(
             'Stopping remote stream with tracks: ${stream.getTracks().length}');
         for (MediaStreamTrack track in stream.getTracks()) {
-          logger.d('Stopping track: ${track.kind}${track.id} ');
-          track.stop();
+          try {
+            logger.d('Stopping remote ${track.kind} track');
+            track.stop();
+          } catch (error) {
+            logger.w('Failed to stop remote track after hangup: $error');
+          }
         }
       }
     } else {
       logger.d("peerConnection is null, can't stop tracks.");
     }
-
-    if (state == CallStateEnum.ENDED) return;
-    _session.terminate(options);
   }
 
   void hold() {
