@@ -82,7 +82,9 @@ source manifest uses relative `id`, `scope`, and `start_url` values so the same
 app remains portable across providers that host it at the domain root or under a
 path.
 
-For the MNSCloud webapps path, build with:
+Each GitHub Release ships a portable prebuilt web bundle
+(`mnscloud-phoneweb-web-v<version>.tar.gz` plus `.sha256`) built with `--base-href /`; hosts set
+`<base href>` in `index.html` to their path. For a path-specific local build:
 
 ```bash
 flutter build web --release --base-href /phoneweb/

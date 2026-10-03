@@ -24,5 +24,6 @@ jobs:
       release_script: scripts/release-phoneweb.sh
       version: ${{ github.event.inputs.version || '' }}
       setup_deno: true
+      setup_flutter: true
       checkout_runtime_kit: true
     secrets: inherit

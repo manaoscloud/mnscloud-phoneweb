@@ -29,13 +29,28 @@ deployments when the Flutter `--base-href` matches the hosting path.
 
 ## MNSCloud Webapps Build
 
-For the current MNSCloud webapps deployment, build with:
+Every release publishes a portable static build as GitHub Release assets:
+
+```text
+mnscloud-phoneweb-web-v<version>.tar.gz
+mnscloud-phoneweb-web-v<version>.tar.gz.sha256
+```
+
+The release job builds it with `flutter build web --release --base-href /`, validates it with
+`scripts/validate-pwa.sh --base-href /`, and records the artifact name, SHA-256, and size under
+`channels.stable.artifact` in `releases/manifest.json`.
+
+`mnscloud-webapps` installs that artifact (`APP_SOURCE=release`), verifies the checksum, and
+rewrites `<base href>` to its hosting path (for example `/phoneweb/`), so the server does not need
+the Flutter SDK. Any other static host can do the same: extract the archive into the served
+directory and set `<base href>` in `index.html` to the hosting path.
+
+To build a path-specific bundle by hand instead:
 
 ```bash
 flutter build web --release --base-href /phoneweb/
+bash scripts/validate-pwa.sh --base-href /phoneweb/
 ```
-
-Then publish the generated `build/web` directory through the webapps runtime.
 
 ## Local Root Build
 

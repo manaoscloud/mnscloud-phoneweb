@@ -43,6 +43,11 @@ const updated = text.replace(versionLine, `$1version: "${version}",`);
 await Deno.writeTextFile(file, updated);
 '
 
+# Static web release artifact consumed by mnscloud-webapps (APP_SOURCE=release). The build uses a
+# portable root base href; the hosting runtime rewrites <base href> to its own path.
+export MNSCLOUD_RUNTIME_KIT_DIR="$RUNTIME_KIT_DIR"
+package_web_artifact='"$MNSCLOUD_RUNTIME_KIT_DIR/scripts/package-static-artifact.sh" --source-dir build/web --name "mnscloud-phoneweb-web-v$(tr -d "[:space:]" < VERSION).tar.gz"'
+
 mrtk_release_prepare \
   --product mnscloud-phoneweb \
   --repository manaoscloud/mnscloud-phoneweb \
@@ -52,4 +57,9 @@ mrtk_release_prepare \
   --validate "grep -q '^version:' pubspec.yaml" \
   --validate "deno eval '${sync_app_build_info_command}'" \
   --validate "deno eval 'const pub=(await Deno.readTextFile(\"pubspec.yaml\")).match(/^version:\\\\s*(.+)$/m)?.[1]?.trim(); const line=(await Deno.readTextFile(\"lib/src/version/app_build_info.dart\")).split(\"\\\\n\").find((item)=>item.trim().startsWith(\"version:\")); const info=line?.match(/[0-9]+[.][0-9]+[.][0-9]+(?:[-+][0-9A-Za-z.-]+)?/)?.[0]; if (pub !== info) throw new Error(\"app build version mismatch: pubspec=\" + pub + \" appBuildInfo=\" + info);'" \
+  --validate "flutter pub get" \
+  --validate "flutter build web --release --base-href /" \
+  --validate "bash scripts/validate-pwa.sh --base-href /" \
+  --validate "$package_web_artifact" \
+  --asset-glob "releases/mnscloud-phoneweb-web-v*.tar.gz*" \
   "$@"
