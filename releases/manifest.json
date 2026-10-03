@@ -3,10 +3,16 @@
   "repository": "manaoscloud/mnscloud-phoneweb",
   "channels": {
     "stable": {
-      "version": "0.1.56",
-      "ref": "v0.1.56",
-      "releasedAt": "2026-08-23T18:08:40Z",
-      "minimumVersion": "0.1.0"
+      "version": "0.1.57",
+      "ref": "v0.1.57",
+      "releasedAt": "2026-10-03T16:22:40Z",
+      "minimumVersion": "0.1.0",
+      "artifact": {
+        "name": "mnscloud-phoneweb-web-v0.1.57.tar.gz",
+        "sha256": "51adfaea8a4222ae3ee3342c50d9db587aa58810f0e0f6ecd1cbba8bfc60495f",
+        "sizeBytes": 14137779,
+        "contentType": "application/gzip"
+      }
     }
   }
 }
