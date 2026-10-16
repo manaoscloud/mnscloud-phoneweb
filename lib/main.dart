@@ -9,6 +9,8 @@ import 'src/audio/keypad_tone_player.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
 import 'src/storage/standalone_phoneweb_store.dart';
+import 'src/version/app_update_controller.dart';
+import 'src/version/app_update_notice.dart';
 import 'src/version/runtime_version.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
 
@@ -100,7 +102,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   int _mobileTabIndex = 0;
   bool _contactsSyncing = false;
   String _contactsStatus = 'Agenda local';
-  RuntimeVersionInfo _runtimeVersion = currentRuntimeVersionInfo();
+  final AppUpdateController _update = AppUpdateController();
   bool _standaloneDirty = false;
   bool _hadActiveCall = false;
   bool _trackedCallEstablished = false;
@@ -116,13 +118,16 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _voip = PhoneWebVoipController();
     _voip.addListener(_syncVoipState);
     _loadStandaloneState();
-    _refreshRuntimeVersion();
+    _update.addListener(_onUpdateChanged);
+    _update.start();
   }
 
   @override
   void dispose() {
     _voip.removeListener(_syncVoipState);
     _voip.dispose();
+    _update.removeListener(_onUpdateChanged);
+    _update.dispose();
     _keypadTonePlayer.dispose();
     super.dispose();
   }
@@ -136,12 +141,12 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     return _accounts.isEmpty ? null : _accounts.first;
   }
 
-  Future<void> _refreshRuntimeVersion() async {
-    final versionInfo = await loadRuntimeVersionInfo();
-    if (!mounted) return;
-    setState(() {
-      _runtimeVersion = versionInfo;
-    });
+  RuntimeVersionInfo get _runtimeVersion => _update.versionInfo;
+
+  Future<void> _refreshRuntimeVersion() => _update.check(force: true);
+
+  void _onUpdateChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadStandaloneState() async {
@@ -564,6 +569,34 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final shell = _buildShell(context);
+    // Never interrupt a call: the notice waits until the call ends.
+    if (!_update.noticeVisible || _voip.hasActiveCall) return shell;
+    final mobile = MediaQuery.sizeOf(context).width < 640;
+    final notice = AppUpdateNotice(controller: _update);
+    return Stack(
+      children: [
+        shell,
+        if (mobile)
+          Positioned(
+            left: 8,
+            right: 8,
+            top: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Center(child: notice),
+              ),
+            ),
+          )
+        else
+          Positioned(right: 24, bottom: 24, child: notice),
+      ],
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     if (width < 640) {
       return MobilePhoneShell(
@@ -2093,7 +2126,6 @@ class VersionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final updateAvailable = versionInfo.updateAvailable;
-    final releaseCatalogBehind = versionInfo.releaseCatalogBehind;
     final foreground = updateAvailable
         ? colorScheme.onTertiaryContainer
         : colorScheme.onSurfaceVariant;
@@ -2106,9 +2138,7 @@ class VersionBadge extends StatelessWidget {
     final current = versionInfo.displayVersion;
     final latest = versionInfo.latestVersion;
     final tooltip = updateAvailable
-        ? 'Current $current · New version v$latest available'
-        : releaseCatalogBehind
-        ? 'Current $current · Release catalog still points to v$latest'
+        ? 'Current $current · Installed v$latest (reload to update)'
         : latest == null
         ? 'Current $current'
         : 'Current $current · Latest v$latest';

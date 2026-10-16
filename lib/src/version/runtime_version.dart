@@ -1,6 +1,4 @@
 import 'app_build_info.dart';
-import 'runtime_version_fetcher_stub.dart'
-    if (dart.library.js_interop) 'runtime_version_fetcher_web.dart';
 
 class RuntimeVersionInfo {
   const RuntimeVersionInfo({
@@ -17,16 +15,11 @@ class RuntimeVersionInfo {
   final String? latestVersion;
   final String? latestBuildRef;
 
+  /// The installed release differs from this bundle (newer, or a rollback).
   bool get updateAvailable {
-    final latest = latestVersion?.trim();
-    if (latest == null || latest.isEmpty) return false;
-    return compareSemver(latest, version) > 0;
-  }
-
-  bool get releaseCatalogBehind {
-    final latest = latestVersion?.trim();
-    if (latest == null || latest.isEmpty) return false;
-    return compareSemver(latest, version) < 0;
+    final latest = normalizeVersion(latestVersion);
+    if (latest.isEmpty) return false;
+    return latest != normalizeVersion(version);
   }
 
   String get displayVersion => 'v$version';
@@ -45,13 +38,11 @@ RuntimeVersionInfo currentRuntimeVersionInfo({
   );
 }
 
-Future<RuntimeVersionInfo> loadRuntimeVersionInfo() async {
-  final latest = await fetchLatestRuntimeRelease(appBuildInfo.product);
-  return currentRuntimeVersionInfo(
-    latestVersion: latest?.version,
-    latestBuildRef: latest?.buildRef,
-  );
-}
+String normalizeVersion(String? value) =>
+    (value ?? '').trim().replaceFirst(RegExp('^v', caseSensitive: false), '');
+
+bool isReleaseVersion(String value) =>
+    RegExp(r'^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$').hasMatch(value);
 
 int compareSemver(String left, String right) {
   final leftParts = _semverParts(left);
