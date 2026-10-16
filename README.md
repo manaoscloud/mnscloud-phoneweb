@@ -298,3 +298,8 @@ a calm card (`Atualizar agora` / `Depois`, 4 h per version): at the bottom right
 top on mobile/PWA so it never covers the dialpad, and hidden during an active call. Native builds
 update through their store and do not run the detector. The settings version badge shows the
 installed release instead of the release catalog.
+
+Critical updates: a release that fixes a serious problem sets `minimumVersion` in
+`web/update-policy.json` (usually to its own version, in the same PR). `mnscloud-webapps` copies it
+into `build.json`; pages running below it get an "important update" notice without the postpone
+action. It never reloads by itself. Keep it `null` for regular releases.

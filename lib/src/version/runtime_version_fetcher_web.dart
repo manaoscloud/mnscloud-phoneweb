@@ -31,9 +31,11 @@ Future<RuntimeReleaseInfo?> fetchLatestRuntimeRelease(String product) async {
     final version = normalizeVersion(decoded['version']?.toString());
     if (!isReleaseVersion(version)) return null;
     final buildRef = decoded['ref']?.toString().trim();
+    final minimum = normalizeVersion(decoded['minimumVersion']?.toString());
     return RuntimeReleaseInfo(
       version: version,
       buildRef: buildRef == null || buildRef.isEmpty ? null : buildRef,
+      minimumVersion: isReleaseVersion(minimum) ? minimum : null,
     );
   } catch (_) {
     return null;

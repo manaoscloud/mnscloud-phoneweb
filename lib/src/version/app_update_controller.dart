@@ -58,8 +58,18 @@ class AppUpdateController extends ChangeNotifier {
     return version != null && version != runningVersion;
   }
 
+  /// The running bundle is below the release `minimumVersion`: the notice
+  /// cannot be postponed (it still never reloads by itself).
+  bool get critical {
+    final minimum = _deployed?.minimumVersion;
+    return minimum != null &&
+        updateAvailable &&
+        compareSemver(runningVersion, minimum) < 0;
+  }
+
   bool get noticeVisible {
     if (!updateAvailable) return false;
+    if (critical) return true;
     final snooze = _snooze;
     return snooze == null ||
         snooze.version != _deployed!.version ||
@@ -111,10 +121,11 @@ class AppUpdateController extends ChangeNotifier {
     if (version == (current?.version ?? runningVersion)) {
       _candidate = null;
       _confirmTimer?.cancel();
-      if (current == null) {
+      if (current == null || current.minimumVersion != build.minimumVersion) {
         _deployed = RuntimeReleaseInfo(
           version: version,
           buildRef: build.buildRef,
+          minimumVersion: build.minimumVersion,
         );
         notifyListeners();
       }
@@ -128,6 +139,7 @@ class AppUpdateController extends ChangeNotifier {
         _deployed = RuntimeReleaseInfo(
           version: version,
           buildRef: build.buildRef,
+          minimumVersion: build.minimumVersion,
         );
         notifyListeners();
       }
