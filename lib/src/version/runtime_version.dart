@@ -68,8 +68,11 @@ List<int> _semverParts(String value) {
 }
 
 class RuntimeReleaseInfo {
-  const RuntimeReleaseInfo({this.version, this.buildRef});
+  const RuntimeReleaseInfo({this.version, this.buildRef, this.minimumVersion});
 
   final String? version;
   final String? buildRef;
+
+  /// Releases below this version must update (critical fix); null when unset.
+  final String? minimumVersion;
 }

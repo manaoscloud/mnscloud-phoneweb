@@ -28,11 +28,11 @@ void main() {
   });
 
   test('announces a new release only after two reads agree 45 s apart', () {
-    controller.observe(build('0.1.59'), t0);
-    controller.observe(build('0.1.59'), t0.add(const Duration(seconds: 44)));
+    controller.observe(build('9.9.9'), t0);
+    controller.observe(build('9.9.9'), t0.add(const Duration(seconds: 44)));
     expect(controller.updateAvailable, isFalse);
     controller.observe(
-      build('0.1.59'),
+      build('9.9.9'),
       t0.add(AppUpdateController.confirmDelay),
     );
     expect(controller.updateAvailable, isTrue);
@@ -41,9 +41,9 @@ void main() {
   });
 
   test('"later" hides the notice for 4 h, a newer release shows it again', () {
-    controller.observe(build('0.1.59'), t0);
+    controller.observe(build('9.9.9'), t0);
     controller.observe(
-      build('0.1.59'),
+      build('9.9.9'),
       t0.add(AppUpdateController.confirmDelay),
     );
     controller.postpone();
@@ -56,18 +56,18 @@ void main() {
 
     controller.postpone();
     final later = now.add(const Duration(minutes: 5));
-    controller.observe(build('0.1.60'), later);
+    controller.observe(build('9.9.10'), later);
     controller.observe(
-      build('0.1.60'),
+      build('9.9.10'),
       later.add(AppUpdateController.confirmDelay),
     );
     expect(controller.noticeVisible, isTrue);
   });
 
   test('a rollback to the running version clears the notice', () {
-    controller.observe(build('0.1.59'), t0);
+    controller.observe(build('9.9.9'), t0);
     controller.observe(
-      build('0.1.59'),
+      build('9.9.9'),
       t0.add(AppUpdateController.confirmDelay),
     );
     final back = t0.add(const Duration(minutes: 10));
@@ -77,5 +77,29 @@ void main() {
       back.add(AppUpdateController.confirmDelay),
     );
     expect(controller.updateAvailable, isFalse);
+  });
+
+  test('a critical release cannot be postponed', () {
+    const critical = RuntimeReleaseInfo(
+      version: '9.9.9',
+      minimumVersion: '9.9.9',
+    );
+    controller.observe(critical, t0);
+    controller.observe(critical, t0.add(AppUpdateController.confirmDelay));
+    expect(controller.critical, isTrue);
+    controller.postpone();
+    expect(controller.noticeVisible, isTrue);
+  });
+
+  test('a release whose minimum the bundle meets stays postponable', () {
+    const regular = RuntimeReleaseInfo(
+      version: '9.9.9',
+      minimumVersion: '0.1.50',
+    );
+    controller.observe(regular, t0);
+    controller.observe(regular, t0.add(AppUpdateController.confirmDelay));
+    expect(controller.critical, isFalse);
+    controller.postpone();
+    expect(controller.noticeVisible, isFalse);
   });
 }
