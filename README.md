@@ -286,3 +286,15 @@ Use placeholder examples such as `pbx.example.com`, `wss://pbx.example.com/ws`,
 - [Provider Compatibility](docs/provider-compatibility.md)
 - [SDK Strategy](docs/sdk-strategy.md)
 - [Roadmap](docs/roadmap.md)
+
+## New version notice
+
+On the web/PWA build an open PhoneWeb detects a newer release without a refresh:
+`lib/src/version/app_update_controller.dart` reads `build.json` (written by `mnscloud-webapps` next
+to `index.html` of the active release) on start, every ~5 min while the page is visible and when it
+becomes visible or online again, and compares it with `appBuildInfo.version` (stamped from
+`pubspec.yaml` at release). A different version is accepted after two reads 45 s apart and shown as
+a calm card (`Atualizar agora` / `Depois`, 4 h per version): at the bottom right on desktop, at the
+top on mobile/PWA so it never covers the dialpad, and hidden during an active call. Native builds
+update through their store and do not run the detector. The settings version badge shows the
+installed release instead of the release catalog.

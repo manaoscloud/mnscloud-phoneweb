@@ -5,26 +5,32 @@ import 'package:web/web.dart' as web;
 
 import 'runtime_version.dart';
 
+/// Reads `build.json`, written by mnscloud-webapps next to `index.html` of the
+/// active release, so the version is the one a reload would load.
 Future<RuntimeReleaseInfo?> fetchLatestRuntimeRelease(String product) async {
-  final base = web.window.location.origin;
-  final url =
-      '$base/api/v1/runtime/releases/latest?product=${Uri.encodeQueryComponent(product)}';
-
   try {
-    final response = await web.window.fetch(url.toJS).toDart;
+    final base = Uri.parse(web.document.baseURI);
+    final url = base
+        .resolve('build.json')
+        .replace(
+          queryParameters: {'t': '${DateTime.now().millisecondsSinceEpoch}'},
+        );
+    final response = await web.window
+        .fetch(
+          url.toString().toJS,
+          web.RequestInit(cache: 'no-store', credentials: 'omit'),
+        )
+        .toDart;
     if (!response.ok) return null;
 
     final body = (await response.text().toDart).toDart;
     final decoded = jsonDecode(body);
     if (decoded is! Map<String, dynamic>) return null;
+    if (decoded['product'] != product) return null;
 
-    final data = decoded['data'];
-    if (data is! Map<String, dynamic>) return null;
-
-    final version = data['version']?.toString().trim();
-    if (version == null || version.isEmpty) return null;
-
-    final buildRef = data['buildRef']?.toString().trim();
+    final version = normalizeVersion(decoded['version']?.toString());
+    if (!isReleaseVersion(version)) return null;
+    final buildRef = decoded['ref']?.toString().trim();
     return RuntimeReleaseInfo(
       version: version,
       buildRef: buildRef == null || buildRef.isEmpty ? null : buildRef,
@@ -33,3 +39,34 @@ Future<RuntimeReleaseInfo?> fetchLatestRuntimeRelease(String product) async {
     return null;
   }
 }
+
+/// Calls [onVisible] whenever the tab becomes visible again.
+void listenPageVisible(void Function() onVisible) {
+  web.document.addEventListener(
+    'visibilitychange',
+    ((web.Event _) {
+      if (web.document.visibilityState == 'visible') onVisible();
+    }).toJS,
+  );
+  web.window.addEventListener('online', ((web.Event _) => onVisible()).toJS);
+}
+
+bool isPageVisible() => web.document.visibilityState == 'visible';
+
+String? readUpdateSnooze(String key) {
+  try {
+    return web.window.localStorage.getItem(key);
+  } catch (_) {
+    return null;
+  }
+}
+
+void writeUpdateSnooze(String key, String value) {
+  try {
+    web.window.localStorage.setItem(key, value);
+  } catch (_) {
+    // Storage may be blocked; the notice still works for this tab.
+  }
+}
+
+void reloadPage() => web.window.location.reload();
