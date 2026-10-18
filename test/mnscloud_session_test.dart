@@ -65,10 +65,17 @@ void main() {
       expect(controller.signedIn, isTrue);
       expect(controller.accessToken, 'access-r1');
       expect(
-        requests.single.url.toString(),
+        requests
+            .firstWhere((r) => r.url.path.endsWith('/signin'))
+            .url
+            .toString(),
         'https://tenant.example.com/api/v1/phone/auth/signin',
       );
-      final body = jsonDecode(requests.single.body) as Map<String, dynamic>;
+      final body =
+          jsonDecode(
+                requests.firstWhere((r) => r.url.path.endsWith('/signin')).body,
+              )
+              as Map<String, dynamic>;
       expect(body['identifier'], 'PH7K2Q9Z');
       expect(body['clientKind'], 'native');
       expect(
@@ -213,4 +220,123 @@ void main() {
     expect(controller.errorMessage, contains('abra o PhoneWeb'));
     controller.dispose();
   });
+
+  test(
+    'signed-in sessions load lines, fetch credentials and take pool lines',
+    () async {
+      final paths = <String>[];
+      var claimed = false;
+      final controller = controllerWith(
+        MockClient((request) async {
+          paths.add('${request.method} ${request.url.path}');
+          final path = request.url.path;
+          if (path.endsWith('/phone/auth/signin')) {
+            return http.Response(jsonEncode(grant('r1')), 200);
+          }
+          if (path.endsWith('/phone/lines')) {
+            expect(request.headers['Authorization'], 'Bearer access-r1');
+            return http.Response(
+              jsonEncode({
+                'data': {
+                  'items': [
+                    {
+                      'lineKey': 'L1',
+                      'source': 'assigned',
+                      'mode': 'dedicated',
+                      'primary': true,
+                      'webrtcReady': true,
+                      'username': '1001',
+                      'label': '1001 · RECEPCAO',
+                    },
+                    if (claimed)
+                      {
+                        'lineKey': 'C1',
+                        'source': 'claimed',
+                        'mode': 'claimed',
+                        'primary': false,
+                        'webrtcReady': true,
+                        'username': '1003',
+                        'label': '1003',
+                      },
+                  ],
+                },
+              }),
+              200,
+            );
+          }
+          if (path.endsWith('/phone/lines/available')) {
+            return http.Response(
+              jsonEncode({
+                'data': {
+                  'items': claimed
+                      ? []
+                      : [
+                          {
+                            'poolUUID': 'P3',
+                            'label': '1003',
+                            'notes': 'POSICAO 3',
+                          },
+                        ],
+                },
+              }),
+              200,
+            );
+          }
+          if (path.endsWith('/phone/lines/claims')) {
+            claimed = true;
+            return http.Response(jsonEncode({'data': {}}), 201);
+          }
+          if (path.endsWith('/phone/lines/claims/C1')) {
+            claimed = false;
+            return http.Response(jsonEncode({'data': {}}), 200);
+          }
+          if (path.endsWith('/phone/lines/L1/credentials')) {
+            return http.Response(
+              jsonEncode({
+                'data': {
+                  'lineKey': 'L1',
+                  'label': '1001 · RECEPCAO',
+                  'sip': {
+                    'username': '1001',
+                    'password': 'line-secret',
+                    'domain': 'pbx.example.com',
+                    'displayName': 'RECEPCAO',
+                  },
+                  'wssUrl': 'wss://webrtc.example.com/ws',
+                  'iceServers': [
+                    {
+                      'urls': ['stun:turn.example.com:3478'],
+                    },
+                  ],
+                },
+              }),
+              200,
+            );
+          }
+          return http.Response('{}', 404);
+        }),
+      );
+      await controller.signIn(
+        identifier: 'a@b.c',
+        password: 'x',
+        server: 'https://t.example.com',
+      );
+      await Future<void>.delayed(Duration.zero);
+      await controller.refreshLines();
+      expect(controller.lines.single.primary, isTrue);
+      expect(controller.availableLines.single.notes, 'POSICAO 3');
+      final credentials = await controller.lineCredentials('L1');
+      expect(credentials?.password, 'line-secret');
+      expect(credentials?.wssUrl, 'wss://webrtc.example.com/ws');
+      expect(credentials?.stunUrls, ['stun:turn.example.com:3478']);
+      expect(await controller.claimLine('P3'), isTrue);
+      expect(controller.lines.map((line) => line.lineKey), ['L1', 'C1']);
+      expect(controller.availableLines, isEmpty);
+      expect(await controller.releaseLine('C1'), isTrue);
+      expect(controller.lines.map((line) => line.lineKey), ['L1']);
+      await controller.signOut();
+      expect(controller.lines, isEmpty);
+      controller.dispose();
+    },
+  );
 }

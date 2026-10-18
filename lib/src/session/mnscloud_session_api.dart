@@ -79,6 +79,110 @@ class MnscloudSessionGrant {
   }
 }
 
+/// A line of the signed-in phone user (no secret).
+class MnscloudLine {
+  const MnscloudLine({
+    required this.lineKey,
+    required this.source,
+    required this.mode,
+    required this.primary,
+    required this.webrtcReady,
+    required this.username,
+    required this.label,
+    required this.domain,
+    this.claimExpiresAt,
+  });
+
+  final String lineKey;
+  final String source;
+  final String mode;
+  final bool primary;
+  final bool webrtcReady;
+  final String username;
+  final String label;
+  final String? domain;
+  final DateTime? claimExpiresAt;
+
+  bool get claimed => source == 'claimed';
+
+  factory MnscloudLine.fromJson(Map<String, dynamic> json) => MnscloudLine(
+    lineKey: json['lineKey']?.toString() ?? '',
+    source: json['source']?.toString() ?? 'assigned',
+    mode: json['mode']?.toString() ?? 'dedicated',
+    primary: json['primary'] == true,
+    webrtcReady: json['webrtcReady'] == true,
+    username: json['username']?.toString() ?? '',
+    label: json['label']?.toString() ?? json['username']?.toString() ?? '',
+    domain: json['domain']?.toString(),
+    claimExpiresAt: DateTime.tryParse(json['claimExpiresAt']?.toString() ?? ''),
+  );
+}
+
+/// A free pool line the phone user can take.
+class MnscloudAvailableLine {
+  const MnscloudAvailableLine({
+    required this.poolUUID,
+    required this.label,
+    this.notes,
+  });
+
+  final String poolUUID;
+  final String label;
+  final String? notes;
+
+  factory MnscloudAvailableLine.fromJson(Map<String, dynamic> json) =>
+      MnscloudAvailableLine(
+        poolUUID: json['poolUUID']?.toString() ?? '',
+        label: json['label']?.toString() ?? json['username']?.toString() ?? '',
+        notes: json['notes']?.toString(),
+      );
+}
+
+/// Registration data of one line. Contains the line secret: keep in memory only.
+class MnscloudLineCredentials {
+  const MnscloudLineCredentials({
+    required this.lineKey,
+    required this.label,
+    required this.username,
+    required this.password,
+    required this.domain,
+    required this.displayName,
+    required this.wssUrl,
+    required this.stunUrls,
+    required this.turnUrls,
+  });
+
+  final String lineKey;
+  final String label;
+  final String username;
+  final String password;
+  final String domain;
+  final String? displayName;
+  final String wssUrl;
+  final List<String> stunUrls;
+  final List<String> turnUrls;
+
+  factory MnscloudLineCredentials.fromJson(Map<String, dynamic> json) {
+    final sip = (json['sip'] as Map?)?.cast<String, dynamic>() ?? {};
+    final urls = <String>[
+      for (final server
+          in (json['iceServers'] as List? ?? const []).whereType<Map>())
+        for (final url in (server['urls'] as List? ?? const [])) url.toString(),
+    ];
+    return MnscloudLineCredentials(
+      lineKey: json['lineKey']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      username: sip['username']?.toString() ?? '',
+      password: sip['password']?.toString() ?? '',
+      domain: sip['domain']?.toString() ?? '',
+      displayName: sip['displayName']?.toString(),
+      wssUrl: json['wssUrl']?.toString() ?? '',
+      stunUrls: urls.where((url) => url.startsWith('stun')).toList(),
+      turnUrls: urls.where((url) => url.startsWith('turn')).toList(),
+    );
+  }
+}
+
 /// Thin client of the public PhoneWeb API. Sends no credentials it was not
 /// given and keeps no state.
 class MnscloudSessionApi {
@@ -124,6 +228,81 @@ class MnscloudSessionApi {
   /// Native: pass the stored refresh token. Web: pass null (HttpOnly cookie).
   Future<MnscloudSessionGrant> refresh(String? refreshToken) async {
     return _grant('phone/auth/refresh', {'refreshToken': ?refreshToken});
+  }
+
+  Future<List<MnscloudLine>> lines(String accessToken) async {
+    final data = await _authorized('GET', 'phone/lines', accessToken);
+    return _items(data).map(MnscloudLine.fromJson).toList();
+  }
+
+  Future<List<MnscloudAvailableLine>> availableLines(String accessToken) async {
+    final data = await _authorized('GET', 'phone/lines/available', accessToken);
+    return _items(data).map(MnscloudAvailableLine.fromJson).toList();
+  }
+
+  Future<void> claimLine(String accessToken, String poolUUID) async {
+    await _authorized('POST', 'phone/lines/claims', accessToken, {
+      'poolUUID': poolUUID,
+    });
+  }
+
+  Future<void> releaseLine(String accessToken, String lineKey) async {
+    await _authorized('DELETE', 'phone/lines/claims/$lineKey', accessToken);
+  }
+
+  Future<MnscloudLineCredentials> lineCredentials(
+    String accessToken,
+    String lineKey,
+  ) async {
+    final data = await _authorized(
+      'POST',
+      'phone/lines/$lineKey/credentials',
+      accessToken,
+    );
+    return MnscloudLineCredentials.fromJson(
+      (data as Map).cast<String, dynamic>(),
+    );
+  }
+
+  List<Map<String, dynamic>> _items(Object? data) {
+    final items = data is Map ? data['items'] : null;
+    return (items as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<Object?> _authorized(
+    String method,
+    String path,
+    String accessToken, [
+    Map<String, Object?>? body,
+  ]) async {
+    final http.Response response;
+    try {
+      final request = http.Request(method, baseUrl.resolve(path))
+        ..headers['Authorization'] = 'Bearer $accessToken';
+      if (body != null) {
+        request.headers['Content-Type'] = 'application/json';
+        request.body = jsonEncode(body);
+      }
+      response = await http.Response.fromStream(await _client.send(request));
+    } catch (_) {
+      throw const MnscloudApiException(
+        'NETWORK_ERROR',
+        'Could not reach the MNSCloud server.',
+      );
+    }
+    final decoded = _decode(response.body);
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded['data'];
+    }
+    throw MnscloudApiException(
+      decoded['code']?.toString() ?? 'HTTP_${response.statusCode}',
+      decoded['error']?.toString() ??
+          'The MNSCloud server refused the request.',
+      status: response.statusCode,
+    );
   }
 
   Future<void> signOut(String accessToken) async {

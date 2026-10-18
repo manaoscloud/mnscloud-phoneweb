@@ -29,6 +29,10 @@ class MnscloudSessionController extends ChangeNotifier {
   String? _errorMessage;
   List<MnscloudTenantChoice> _tenantChoices = const [];
   Timer? _refreshTimer;
+  List<MnscloudLine> _lines = const [];
+  List<MnscloudAvailableLine> _available = const [];
+  bool _linesLoading = false;
+  String? _linesError;
 
   MnscloudSessionStatus get status => _status;
   MnscloudSessionGrant? get session => _grant;
@@ -38,6 +42,14 @@ class MnscloudSessionController extends ChangeNotifier {
   String? get errorCode => _errorCode;
   String? get errorMessage => _errorMessage;
   List<MnscloudTenantChoice> get tenantChoices => _tenantChoices;
+
+  /// Lines of the signed-in phone user (assigned and claimed). No secrets.
+  List<MnscloudLine> get lines => _lines;
+
+  /// Free pool lines the user can take now.
+  List<MnscloudAvailableLine> get availableLines => _available;
+  bool get linesLoading => _linesLoading;
+  String? get linesError => _linesError;
 
   /// Whether the user must type the server URL (native builds).
   bool get needsServer => _platform.defaultServer == null;
@@ -104,12 +116,70 @@ class MnscloudSessionController extends ChangeNotifier {
     );
   }
 
+  /// Loads my lines and the free pool lines.
+  Future<void> refreshLines() async {
+    final token = accessToken;
+    if (token == null || _server == null) return;
+    _linesLoading = true;
+    _linesError = null;
+    notifyListeners();
+    try {
+      _lines = await _api.lines(token);
+      _available = await _api.availableLines(token);
+    } on MnscloudApiException catch (error) {
+      _linesError = error.message;
+    } finally {
+      _linesLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> claimLine(String poolUUID) =>
+      _lineAction((token) => _api.claimLine(token, poolUUID));
+
+  Future<bool> releaseLine(String lineKey) =>
+      _lineAction((token) => _api.releaseLine(token, lineKey));
+
+  /// Registration data of one line, fetched on demand and never stored.
+  Future<MnscloudLineCredentials?> lineCredentials(String lineKey) async {
+    final token = accessToken;
+    if (token == null || _server == null) return null;
+    try {
+      return await _api.lineCredentials(token, lineKey);
+    } on MnscloudApiException catch (error) {
+      _linesError = error.status == 409
+          ? 'Esta linha ainda não tem acesso WebRTC. Fale com o administrador.'
+          : error.message;
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> _lineAction(Future<void> Function(String token) action) async {
+    final token = accessToken;
+    if (token == null || _server == null) return false;
+    try {
+      await action(token);
+      await refreshLines();
+      return true;
+    } on MnscloudApiException catch (error) {
+      _linesError = error.status == 409
+          ? 'Esta linha foi pega por outra pessoa ou você já tem linhas demais.'
+          : error.message;
+      notifyListeners();
+      await refreshLines();
+      return false;
+    }
+  }
+
   Future<void> signOut() async {
     final token = _grant?.accessToken;
     _refreshTimer?.cancel();
     _grant = null;
     _status = MnscloudSessionStatus.signedOut;
     _tenantChoices = const [];
+    _lines = const [];
+    _available = const [];
     notifyListeners();
     await _platform.writeRefreshToken(null);
     if (token != null && _server != null) await _api.signOut(token);
@@ -132,6 +202,8 @@ class MnscloudSessionController extends ChangeNotifier {
       _grant = null;
       _status = MnscloudSessionStatus.signedOut;
       _tenantChoices = error.tenants;
+      _lines = const [];
+      _available = const [];
       if (error.status == 401) await _platform.writeRefreshToken(null);
       if (!quiet) {
         _errorCode = error.code;
@@ -143,12 +215,14 @@ class MnscloudSessionController extends ChangeNotifier {
   }
 
   void _accept(MnscloudSessionGrant grant) {
+    final firstGrant = _grant?.sessionUUID != grant.sessionUUID;
     _grant = grant;
     _status = MnscloudSessionStatus.signedIn;
     _tenantChoices = const [];
     unawaited(_platform.writeRefreshToken(grant.refreshToken));
     _scheduleRefresh(grant.expiresIn);
     notifyListeners();
+    if (firstGrant) unawaited(refreshLines());
   }
 
   void _scheduleRefresh(Duration expiresIn) {
@@ -199,8 +273,17 @@ class MnscloudSessionController extends ChangeNotifier {
     };
   }
 
+  bool _disposed = false;
+
+  /// Network calls may finish after the screen is gone: never notify a disposed controller.
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _refreshTimer?.cancel();
     super.dispose();
   }
