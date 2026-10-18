@@ -9,6 +9,7 @@ import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
+import 'src/session/mnscloud_session_api.dart';
 import 'src/session/mnscloud_session_controller.dart';
 import 'src/session/mnscloud_session_section.dart';
 import 'src/storage/standalone_phoneweb_store.dart';
@@ -124,6 +125,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _loadStandaloneState();
     _update.addListener(_onUpdateChanged);
     _update.start();
+    _mnscloud.addListener(_onMnscloudChanged);
     unawaited(_mnscloud.restore());
   }
 
@@ -133,6 +135,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _voip.dispose();
     _update.removeListener(_onUpdateChanged);
     _update.dispose();
+    _mnscloud.removeListener(_onMnscloudChanged);
     _mnscloud.dispose();
     _keypadTonePlayer.dispose();
     super.dispose();
@@ -198,10 +201,128 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
   Future<void> _saveStandaloneAccounts() {
     _standaloneDirty = true;
+    final selected = _selectedAccountId;
     return _store.saveAccounts(
-      _accounts,
-      selectedAccountId: _selectedAccountId,
+      _accounts.where((account) => !account.managed).toList(),
+      selectedAccountId: selected != null && selected.startsWith(_managedPrefix)
+          ? null
+          : selected,
     );
+  }
+
+  static const _managedPrefix = 'mnscloud:';
+  bool _syncingLines = false;
+  bool _syncAgain = false;
+
+  void _onMnscloudChanged() {
+    if (mounted) setState(() {});
+    unawaited(_syncMnscloudLines());
+  }
+
+  /// Mirrors the lines of the MNSCloud session as managed accounts (memory only). The secret of
+  /// each line is fetched on demand and dropped with the account.
+  Future<void> _syncMnscloudLines() async {
+    if (_syncingLines) {
+      _syncAgain = true;
+      return;
+    }
+    _syncingLines = true;
+    try {
+      do {
+        _syncAgain = false;
+        await _applyMnscloudLines();
+      } while (_syncAgain && mounted);
+    } finally {
+      _syncingLines = false;
+    }
+  }
+
+  Future<void> _applyMnscloudLines() async {
+    final wanted = _mnscloud.signedIn
+        ? {
+            for (final line in _mnscloud.lines.where((l) => l.webrtcReady))
+              '$_managedPrefix${line.lineKey}': line,
+          }
+        : <String, MnscloudLine>{};
+    final removed = _accounts
+        .where((account) => account.managed && !wanted.containsKey(account.id))
+        .toList();
+    if (removed.isNotEmpty) {
+      final active = _selectedAccount;
+      final activeRemoved =
+          active != null &&
+          removed.any((account) => account.id == active.id) &&
+          (active.status == RegistrationStatus.registered ||
+              active.status == RegistrationStatus.registering);
+      if (!mounted) return;
+      setState(() {
+        _accounts.removeWhere(
+          (account) => removed.any((gone) => gone.id == account.id),
+        );
+        if (_selectedAccountId != null &&
+            removed.any((gone) => gone.id == _selectedAccountId)) {
+          _selectedAccountId = _accounts.isEmpty ? null : _accounts.first.id;
+        }
+      });
+      if (activeRemoved) await _voip.unregister();
+    }
+    for (final entry in wanted.entries) {
+      if (_accounts.any((account) => account.id == entry.key)) continue;
+      final credentials = await _mnscloud.lineCredentials(entry.value.lineKey);
+      if (credentials == null || !mounted || !_mnscloud.signedIn) continue;
+      final account = WebRtcAccount(
+        id: entry.key,
+        name:
+            'MNSCloud · ${credentials.label.isEmpty ? credentials.username : credentials.label}',
+        displayName:
+            credentials.displayName ??
+            _mnscloud.session?.displayName ??
+            credentials.username,
+        username: credentials.username,
+        password: credentials.password,
+        domain: credentials.domain,
+        wssServer: credentials.wssUrl,
+        stunServer: credentials.stunUrls.isEmpty
+            ? ''
+            : credentials.stunUrls.first,
+        turnServer: credentials.turnUrls.isEmpty
+            ? ''
+            : credentials.turnUrls.first,
+        hasPassword: true,
+        allowInsecureTransport: false,
+        codecPolicy: WebRtcCodecPolicy.automaticRecommended,
+        enabled: false,
+        autoRegister: true,
+        status: RegistrationStatus.offline,
+        managedBy: 'MNSCloud',
+      );
+      setState(() => _accounts.add(account));
+      // Register the primary (or first) company line when nothing else is active.
+      final busy = _accounts.any(
+        (item) =>
+            item.status == RegistrationStatus.registered ||
+            item.status == RegistrationStatus.registering,
+      );
+      if (!busy && (entry.value.primary || wanted.length == 1)) {
+        setState(() {
+          _selectedAccountId = account.id;
+          _enforceSingleActiveAccount(account.id);
+        });
+        await _voip.register(account);
+      }
+    }
+  }
+
+  bool _refuseManaged(WebRtcAccount? account) {
+    if (account == null || !account.managed) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Linha gerenciada pela sua empresa na MNSCloud: não pode ser editada nem excluída aqui.',
+        ),
+      ),
+    );
+    return true;
   }
 
   Future<void> _saveStandaloneContacts() {
@@ -215,6 +336,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   Future<void> _openAccountDialog({WebRtcAccount? account}) async {
+    if (_refuseManaged(account)) return;
     final result = await showDialog<WebRtcAccount>(
       context: context,
       builder: (context) => AccountDialog(account: account),
@@ -246,6 +368,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   }
 
   Future<void> _removeAccount(WebRtcAccount account) async {
+    if (_refuseManaged(account)) return;
     setState(() {
       _accounts.removeWhere((item) => item.id == account.id);
       if (_selectedAccountId == account.id) {

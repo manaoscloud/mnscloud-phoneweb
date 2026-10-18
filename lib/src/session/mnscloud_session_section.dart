@@ -205,13 +205,8 @@ class _SignedIn extends StatelessWidget {
           title: Text(session.displayName ?? 'Conectado'),
           subtitle: Text(_realms[session.realm] ?? session.realm),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Conectado à MNSCloud. As linhas que sua empresa atribuir a você aparecerão aqui.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
-        ),
+        const SizedBox(height: 12),
+        _LinesBlock(controller: controller),
         if (expires != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -236,4 +231,97 @@ class _SignedIn extends StatelessWidget {
   }
 
   static String _two(int value) => value.toString().padLeft(2, '0');
+}
+
+class _LinesBlock extends StatelessWidget {
+  const _LinesBlock({required this.controller});
+
+  final MnscloudSessionController controller;
+
+  String _source(MnscloudLine line) {
+    if (line.claimed) return 'Ramal livre (reservado)';
+    final kind = line.mode == 'shared' ? 'Compartilhada' : 'Dedicada';
+    return line.primary ? '$kind · principal' : kind;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('Minhas linhas', style: text.titleSmall)),
+            IconButton(
+              tooltip: 'Atualizar linhas',
+              onPressed: controller.linesLoading
+                  ? null
+                  : controller.refreshLines,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        if (controller.linesLoading) const LinearProgressIndicator(),
+        if (controller.lines.isEmpty && !controller.linesLoading)
+          Text(
+            'Nenhuma linha atribuída. Pegue um ramal livre abaixo ou peça ao administrador.',
+            style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+          ),
+        for (final line in controller.lines)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              line.webrtcReady
+                  ? Icons.phone_in_talk_outlined
+                  : Icons.phone_disabled_outlined,
+              color: line.webrtcReady ? colors.primary : colors.error,
+            ),
+            title: Text(
+              line.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              line.webrtcReady
+                  ? _source(line)
+                  : '${_source(line)} · sem acesso WebRTC',
+              maxLines: 2,
+            ),
+            trailing: line.claimed
+                ? TextButton(
+                    onPressed: () => controller.releaseLine(line.lineKey),
+                    child: const Text('Liberar'),
+                  )
+                : null,
+          ),
+        if (controller.availableLines.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text('Ramais livres', style: text.titleSmall),
+          for (final free in controller.availableLines)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event_seat_outlined),
+              title: Text(
+                free.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: free.notes == null
+                  ? null
+                  : Text(free.notes!, maxLines: 1),
+              trailing: FilledButton.tonal(
+                onPressed: () => controller.claimLine(free.poolUUID),
+                child: const Text('Pegar'),
+              ),
+            ),
+        ],
+        if (controller.linesError != null) ...[
+          const SizedBox(height: 8),
+          Text(controller.linesError!, style: TextStyle(color: colors.error)),
+        ],
+      ],
+    );
+  }
 }

@@ -317,6 +317,7 @@ class WebRtcAccount {
     required this.autoRegister,
     required this.status,
     this.diagnostic,
+    this.managedBy,
   });
 
   final String id;
@@ -335,6 +336,11 @@ class WebRtcAccount {
   final bool autoRegister;
   final RegistrationStatus status;
   final RegistrationDiagnostic? diagnostic;
+
+  /// Set for lines provisioned by MNSCloud: never persisted, never edited by the user.
+  final String? managedBy;
+
+  bool get managed => managedBy != null;
 
   factory WebRtcAccount.fromJson(Map<String, dynamic> json) {
     return WebRtcAccount(
@@ -396,6 +402,7 @@ class WebRtcAccount {
     bool? autoRegister,
     RegistrationStatus? status,
     RegistrationDiagnostic? diagnostic,
+    String? managedBy,
   }) {
     return WebRtcAccount(
       id: id ?? this.id,
@@ -415,6 +422,7 @@ class WebRtcAccount {
       autoRegister: autoRegister ?? this.autoRegister,
       status: status ?? this.status,
       diagnostic: diagnostic ?? this.diagnostic,
+      managedBy: managedBy ?? this.managedBy,
     );
   }
 }
