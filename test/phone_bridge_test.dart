@@ -66,6 +66,12 @@ class _Host extends ChangeNotifier implements PhoneBridgeHost {
     calls.add('dtmf:$tones');
     return null;
   }
+
+  @override
+  Future<String?> signOut() async {
+    calls.add('signOut');
+    return null;
+  }
 }
 
 class _Transport implements PhoneBridgeTransport {
@@ -148,10 +154,16 @@ void main() {
     transport.controller.add(_cmd(3, 'phone.mute', {'muted': true}));
     transport.controller.add(_cmd(4, 'phone.dtmf', {'tones': '12#'}));
     transport.controller.add(_cmd(5, 'phone.nope'));
+    transport.controller.add(_cmd(8, 'phone.signOut'));
     transport.controller.add({..._cmd(6, 'phone.hangup'), 'v': 2});
     transport.controller.add({'type': 'phone.hangup', 'v': 1, 'id': 7});
     await pumpEventQueue();
-    expect(host.calls, ['dial:92999990000', 'mute:true', 'dtmf:12#']);
+    expect(host.calls, [
+      'dial:92999990000',
+      'mute:true',
+      'dtmf:12#',
+      'signOut',
+    ]);
     expect(focused, '92999990000');
     expect(transport.replyTo(1), {'ok': true});
     expect(transport.replyTo(2), {'ok': false, 'error': 'INVALID_NUMBER'});

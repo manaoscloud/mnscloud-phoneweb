@@ -63,6 +63,13 @@ class VoipBridgeHost implements PhoneBridgeHost {
   }
 
   @override
+  Future<String?> signOut() async {
+    if (voip.hasActiveCall) voip.rejectOrHangup();
+    await session.signOut();
+    return null;
+  }
+
+  @override
   String? dtmf(String tones) {
     if (!voip.hasEstablishedCall) return 'NO_CALL';
     for (final tone in tones.split('')) {

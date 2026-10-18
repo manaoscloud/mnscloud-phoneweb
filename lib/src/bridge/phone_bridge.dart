@@ -61,6 +61,9 @@ abstract class PhoneBridgeHost {
   String? hangup();
   String? setMuted(bool muted);
   String? dtmf(String tones);
+
+  /// Ends the MNSCloud session of the phone (App sign-out); manual accounts stay.
+  Future<String?> signOut();
 }
 
 /// Message transport (web: `postMessage` with exact origin checks).
@@ -204,6 +207,8 @@ class PhoneBridge {
           return;
         }
         _reply(id, error: host.dtmf(tones));
+      case 'phone.signOut':
+        _reply(id, error: await host.signOut());
       default:
         _reply(id, error: 'UNKNOWN_COMMAND');
     }

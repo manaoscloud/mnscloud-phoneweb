@@ -30,6 +30,7 @@ Commands (App → phone), answered by `{ type: "reply", id, payload: { ok, error
 | `phone.hangup` | – | `NO_CALL` |
 | `phone.mute` | `{ muted }` | `NO_CALL` |
 | `phone.dtmf` | `{ tones }` (`0-9*#A-D`) | `INVALID_DTMF`, `NO_CALL` |
+| `phone.signOut` | – (App sign-out: hangs up, ends the MNSCloud session; manual accounts stay) | – |
 
 Events (phone → App):
 
