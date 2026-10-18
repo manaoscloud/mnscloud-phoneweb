@@ -150,6 +150,8 @@ class MnscloudLineCredentials {
     required this.wssUrl,
     required this.stunUrls,
     required this.turnUrls,
+    this.iceServers = const [],
+    this.iceExpiresAt,
   });
 
   final String lineKey;
@@ -161,6 +163,10 @@ class MnscloudLineCredentials {
   final String wssUrl;
   final List<String> stunUrls;
   final List<String> turnUrls;
+
+  /// One entry per url, with the TURN REST username/credential when issued.
+  final List<Map<String, String>> iceServers;
+  final DateTime? iceExpiresAt;
 
   factory MnscloudLineCredentials.fromJson(Map<String, dynamic> json) {
     final sip = (json['sip'] as Map?)?.cast<String, dynamic>() ?? {};
@@ -179,6 +185,19 @@ class MnscloudLineCredentials {
       wssUrl: json['wssUrl']?.toString() ?? '',
       stunUrls: urls.where((url) => url.startsWith('stun')).toList(),
       turnUrls: urls.where((url) => url.startsWith('turn')).toList(),
+      iceServers: [
+        for (final server
+            in (json['iceServers'] as List? ?? const []).whereType<Map>())
+          for (final url in (server['urls'] as List? ?? const []))
+            {
+              'urls': url.toString(),
+              if (server['username'] != null)
+                'username': server['username'].toString(),
+              if (server['credential'] != null)
+                'credential': server['credential'].toString(),
+            },
+      ],
+      iceExpiresAt: DateTime.tryParse(json['iceExpiresAt']?.toString() ?? ''),
     );
   }
 }

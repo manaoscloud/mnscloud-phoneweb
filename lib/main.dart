@@ -116,6 +116,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   String _trackedCallAccountName = '';
   String _trackedCallDiagnostic = '';
   DateTime? _trackedCallStartedAt;
+  Timer? _iceRefreshTimer;
 
   @override
   void initState() {
@@ -127,10 +128,15 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _update.start();
     _mnscloud.addListener(_onMnscloudChanged);
     unawaited(_mnscloud.restore());
+    _iceRefreshTimer = Timer.periodic(
+      const Duration(minutes: 10),
+      (_) => unawaited(_refreshManagedIce()),
+    );
   }
 
   @override
   void dispose() {
+    _iceRefreshTimer?.cancel();
     _voip.removeListener(_syncVoipState);
     _voip.dispose();
     _update.removeListener(_onUpdateChanged);
@@ -288,6 +294,8 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         turnServer: credentials.turnUrls.isEmpty
             ? ''
             : credentials.turnUrls.first,
+        iceServers: credentials.iceServers,
+        iceExpiresAt: credentials.iceExpiresAt,
         hasPassword: true,
         allowInsecureTransport: false,
         codecPolicy: WebRtcCodecPolicy.automaticRecommended,
@@ -309,6 +317,39 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
           _enforceSingleActiveAccount(account.id);
         });
         await _voip.register(account);
+      }
+    }
+  }
+
+  /// TURN credentials of company lines are short-lived: fetch a new bundle
+  /// within the last hour and swap it in (the next call uses it; an active
+  /// registration is kept).
+  Future<void> _refreshManagedIce() async {
+    if (!_mnscloud.signedIn) return;
+    final soon = DateTime.now().add(const Duration(hours: 1));
+    final due = _accounts
+        .where(
+          (account) =>
+              account.managed &&
+              account.iceExpiresAt != null &&
+              account.iceExpiresAt!.isBefore(soon),
+        )
+        .toList();
+    for (final account in due) {
+      final lineKey = account.id.substring(_managedPrefix.length);
+      final credentials = await _mnscloud.lineCredentials(lineKey);
+      if (credentials == null || !mounted || !_mnscloud.signedIn) continue;
+      final index = _accounts.indexWhere((item) => item.id == account.id);
+      if (index < 0) continue;
+      final updated = _accounts[index].copyWith(
+        iceServers: credentials.iceServers,
+        iceExpiresAt: credentials.iceExpiresAt,
+      );
+      setState(() => _accounts[index] = updated);
+      // Same account key while registered: the controller swaps the account in
+      // place without a new REGISTER.
+      if (_voip.account?.id == updated.id && _voip.isRegistered) {
+        await _voip.register(updated);
       }
     }
   }
