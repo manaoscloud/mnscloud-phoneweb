@@ -7,6 +7,9 @@ import 'package:sip_ua/sip_ua.dart';
 
 import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
+import 'src/bridge/phone_bridge.dart';
+import 'src/bridge/phone_bridge_transport.dart';
+import 'src/bridge/voip_bridge_host.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
 import 'src/session/mnscloud_session_api.dart';
@@ -117,6 +120,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   String _trackedCallDiagnostic = '';
   DateTime? _trackedCallStartedAt;
   Timer? _iceRefreshTimer;
+  PhoneBridge? _bridge;
 
   @override
   void initState() {
@@ -128,6 +132,16 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _update.start();
     _mnscloud.addListener(_onMnscloudChanged);
     unawaited(_mnscloud.restore());
+    // Embedded in the App phone dock (`?embed=app`): Phone Bridge v1.
+    final bridgeTransport = createEmbeddedBridgeTransport();
+    if (bridgeTransport != null) {
+      _bridge = PhoneBridge(
+        host: VoipBridgeHost(_voip, _mnscloud),
+        transport: bridgeTransport,
+        appVersion: currentRuntimeVersionInfo().version,
+        onFocus: _focusFromBridge,
+      )..start();
+    }
     _iceRefreshTimer = Timer.periodic(
       const Duration(minutes: 10),
       (_) => unawaited(_refreshManagedIce()),
@@ -137,6 +151,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   @override
   void dispose() {
     _iceRefreshTimer?.cancel();
+    _bridge?.dispose();
     _voip.removeListener(_syncVoipState);
     _voip.dispose();
     _update.removeListener(_onUpdateChanged);
@@ -352,6 +367,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         await _voip.register(updated);
       }
     }
+  }
+
+  void _focusFromBridge(String? number) {
+    if (!mounted) return;
+    setState(() {
+      if (number != null) _dialNumber = number;
+      _mobileTabIndex = 0;
+    });
   }
 
   bool _refuseManaged(WebRtcAccount? account) {
