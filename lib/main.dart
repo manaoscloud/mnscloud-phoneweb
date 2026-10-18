@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
+import 'src/session/mnscloud_session_controller.dart';
+import 'src/session/mnscloud_session_section.dart';
 import 'src/storage/standalone_phoneweb_store.dart';
 import 'src/version/app_update_controller.dart';
 import 'src/version/app_update_notice.dart';
@@ -96,6 +99,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       NativeContactsRepository();
   final KeypadTonePlayer _keypadTonePlayer = KeypadTonePlayer();
   late final PhoneWebVoipController _voip;
+  final MnscloudSessionController _mnscloud = MnscloudSessionController();
   String? _selectedAccountId;
   String _dialNumber = '';
   String _lastEvent = 'Ready';
@@ -120,6 +124,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _loadStandaloneState();
     _update.addListener(_onUpdateChanged);
     _update.start();
+    unawaited(_mnscloud.restore());
   }
 
   @override
@@ -128,6 +133,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _voip.dispose();
     _update.removeListener(_onUpdateChanged);
     _update.dispose();
+    _mnscloud.dispose();
     _keypadTonePlayer.dispose();
     super.dispose();
   }
@@ -511,6 +517,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     final compact = MediaQuery.sizeOf(context).width < 720;
     final settings = PhoneWebSettingsDialog(
       voip: _voip,
+      mnscloud: _mnscloud,
       accounts: _accounts,
       runtimeVersion: _runtimeVersion,
       onRefreshVersion: _refreshRuntimeVersion,
@@ -2191,11 +2198,12 @@ class VersionBadge extends StatelessWidget {
   }
 }
 
-enum PhoneWebSettingsSection { interface, audioVideo, debug }
+enum PhoneWebSettingsSection { mnscloud, interface, audioVideo, debug }
 
 class PhoneWebSettingsDialog extends StatefulWidget {
   const PhoneWebSettingsDialog({
     required this.voip,
+    required this.mnscloud,
     required this.accounts,
     required this.runtimeVersion,
     required this.onRefreshVersion,
@@ -2203,6 +2211,7 @@ class PhoneWebSettingsDialog extends StatefulWidget {
   });
 
   final PhoneWebVoipController voip;
+  final MnscloudSessionController mnscloud;
   final List<WebRtcAccount> accounts;
   final RuntimeVersionInfo runtimeVersion;
   final VoidCallback onRefreshVersion;
@@ -2339,6 +2348,9 @@ class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
 
   Widget _buildSelectedSection(ColorScheme colorScheme) {
     return switch (_section) {
+      PhoneWebSettingsSection.mnscloud => MnscloudSessionSection(
+        controller: widget.mnscloud,
+      ),
       PhoneWebSettingsSection.interface => _InterfaceSettingsSection(
         versionInfo: widget.runtimeVersion,
         onRefreshVersion: widget.onRefreshVersion,
@@ -2367,6 +2379,7 @@ class _SettingsSectionSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
+      (PhoneWebSettingsSection.mnscloud, Icons.cloud_outlined, 'MNSCloud'),
       (PhoneWebSettingsSection.interface, Icons.palette_outlined, 'Interface'),
       (
         PhoneWebSettingsSection.audioVideo,

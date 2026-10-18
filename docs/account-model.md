@@ -121,6 +121,22 @@ abstract class AccountRepository {
 - TURN should start with `turn:` or `turns:`.
 - Logs and validation errors must not echo passwords or TURN credentials.
 
+## MNSCloud Sign-in (optional)
+
+Settings › MNSCloud signs in with an identity the user already has in MNSCloud
+(App e-mail, Pulse login code or customer portal login). PhoneWeb keeps no
+password of its own:
+
+- web/PWA: the API is the origin that hosts PhoneWeb; the refresh token is an
+  HttpOnly cookie the app never reads; `#handoff=<code>` from the App signs in
+  without typing the password and is removed from the URL at once;
+- native builds: the user types the MNSCloud server (`https` only) and the
+  refresh token is kept in the OS keychain/keystore;
+- the access token lives only in memory and is renewed before it expires.
+
+Signing in never changes manual accounts. Lines assigned by the company come in
+a later release.
+
 ## Future Provisioning
 
 Manual configuration is the default. Future provisioning may be added through:
