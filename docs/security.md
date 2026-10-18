@@ -11,11 +11,24 @@ Account metadata:
 - no password fields
 - no TURN password fields
 
-Secrets:
+Secrets (`lib/src/storage/account_secret_store*.dart`):
 
-- `flutter_secure_storage`
+- native builds (Android, iOS, macOS, Windows, Linux): `flutter_secure_storage`
+  (operating system keychain/keystore)
+- web/PWA: AES-GCM ciphertext in `localStorage`
+  (`mnscloud_phoneweb.secret.v1.<account_id>`), encrypted with a
+  **non-extractable** WebCrypto key kept only in IndexedDB
+  (`mnscloud_phoneweb_keys`); without WebCrypto or IndexedDB the password stays
+  in memory and must be typed again after a reload
 - one secret entry per account and secret type
 - delete secrets when an account is removed
+- records saved by releases before v0.1.61 kept the password inside the account
+  JSON; the first load moves it into the secret store and rewrites the record
+  without it
+
+The web protection covers stored data at rest (disk, profile copies, storage
+dumps). Script running inside the PhoneWeb origin can still use the key, so the
+usual XSS defenses remain mandatory.
 
 Example secret keys:
 

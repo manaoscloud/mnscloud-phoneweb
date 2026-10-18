@@ -4,10 +4,16 @@ import 'package:web/web.dart' as web;
 
 import '../account/webrtc_account.dart';
 import '../contacts/phone_contact.dart';
+import 'account_secret_store.dart';
+import 'account_secret_sync.dart';
 import 'standalone_phoneweb_store_shared_preferences.dart'
     show StandalonePhoneWebState;
 
 class StandalonePhoneWebStore {
+  StandalonePhoneWebStore({AccountSecretStore? secrets})
+    : _secrets = AccountSecretSync(secrets ?? AccountSecretStore());
+
+  final AccountSecretSync _secrets;
   static const _accountsKey = 'mnscloud_phoneweb.accounts.v1';
   static const _contactsKey = 'mnscloud_phoneweb.contacts.v1';
   static const _historyKey = 'mnscloud_phoneweb.call_history.v1';
@@ -15,8 +21,12 @@ class StandalonePhoneWebStore {
   static const _maxHistoryItems = 250;
 
   Future<StandalonePhoneWebState> load() async {
+    final hydrated = await _secrets.hydrate(
+      _decodeList(_read(_accountsKey), WebRtcAccount.fromJson),
+    );
+    if (hydrated.migrated) _writeAccountsMetadata(hydrated.accounts);
     return StandalonePhoneWebState(
-      accounts: _decodeList(_read(_accountsKey), WebRtcAccount.fromJson),
+      accounts: hydrated.accounts,
       contacts: _decodeList(_read(_contactsKey), PhoneContact.fromJson),
       callHistory: _decodeList(
         _read(_historyKey),
@@ -30,10 +40,12 @@ class StandalonePhoneWebStore {
     List<WebRtcAccount> accounts, {
     String? selectedAccountId,
   }) async {
-    _write(
-      _accountsKey,
-      jsonEncode(accounts.map((account) => account.toJson()).toList()),
-    );
+    final previousIds = _decodeList(
+      _read(_accountsKey),
+      WebRtcAccount.fromJson,
+    ).map((account) => account.id);
+    _writeAccountsMetadata(accounts);
+    await _secrets.save(accounts, previousIds: previousIds.toList());
     if (selectedAccountId == null || selectedAccountId.isEmpty) {
       _remove(_selectedAccountKey);
     } else {
@@ -54,6 +66,13 @@ class StandalonePhoneWebStore {
     _write(
       _historyKey,
       jsonEncode(limited.map((entry) => entry.toJson()).toList()),
+    );
+  }
+
+  void _writeAccountsMetadata(List<WebRtcAccount> accounts) {
+    _write(
+      _accountsKey,
+      jsonEncode(accounts.map((account) => account.toJson()).toList()),
     );
   }
 
