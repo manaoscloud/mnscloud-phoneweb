@@ -4,8 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../account/webrtc_account.dart';
 import '../contacts/phone_contact.dart';
+import 'account_secret_store.dart';
+import 'account_secret_sync.dart';
 
 class StandalonePhoneWebStore {
+  StandalonePhoneWebStore({AccountSecretStore? secrets})
+    : _secrets = AccountSecretSync(secrets ?? AccountSecretStore());
+
+  final AccountSecretSync _secrets;
   static const _accountsKey = 'mnscloud_phoneweb.accounts.v1';
   static const _contactsKey = 'mnscloud_phoneweb.contacts.v1';
   static const _historyKey = 'mnscloud_phoneweb.call_history.v1';
@@ -14,11 +20,14 @@ class StandalonePhoneWebStore {
 
   Future<StandalonePhoneWebState> load() async {
     final prefs = await SharedPreferences.getInstance();
+    final hydrated = await _secrets.hydrate(
+      _decodeList(prefs.getString(_accountsKey), WebRtcAccount.fromJson),
+    );
+    if (hydrated.migrated) {
+      await _writeAccountsMetadata(prefs, hydrated.accounts);
+    }
     return StandalonePhoneWebState(
-      accounts: _decodeList(
-        prefs.getString(_accountsKey),
-        WebRtcAccount.fromJson,
-      ),
+      accounts: hydrated.accounts,
       contacts: _decodeList(
         prefs.getString(_contactsKey),
         PhoneContact.fromJson,
@@ -36,10 +45,12 @@ class StandalonePhoneWebStore {
     String? selectedAccountId,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _accountsKey,
-      jsonEncode(accounts.map((account) => account.toJson()).toList()),
-    );
+    final previousIds = _decodeList(
+      prefs.getString(_accountsKey),
+      WebRtcAccount.fromJson,
+    ).map((account) => account.id).toList();
+    await _writeAccountsMetadata(prefs, accounts);
+    await _secrets.save(accounts, previousIds: previousIds);
     if (selectedAccountId == null || selectedAccountId.isEmpty) {
       await prefs.remove(_selectedAccountKey);
     } else {
@@ -62,6 +73,16 @@ class StandalonePhoneWebStore {
     await prefs.setString(
       _historyKey,
       jsonEncode(limited.map((entry) => entry.toJson()).toList()),
+    );
+  }
+
+  Future<void> _writeAccountsMetadata(
+    SharedPreferences prefs,
+    List<WebRtcAccount> accounts,
+  ) {
+    return prefs.setString(
+      _accountsKey,
+      jsonEncode(accounts.map((account) => account.toJson()).toList()),
     );
   }
 

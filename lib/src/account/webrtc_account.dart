@@ -365,7 +365,8 @@ class WebRtcAccount {
       'name': name,
       'displayName': displayName,
       'username': username,
-      'password': password,
+      // The SIP password is never part of the metadata record; it lives in
+      // AccountSecretStore (docs/security.md).
       'domain': domain,
       'wssServer': wssServer,
       'stunServer': stunServer,

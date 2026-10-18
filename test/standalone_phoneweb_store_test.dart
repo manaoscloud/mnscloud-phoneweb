@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mnscloud_phoneweb/src/account/webrtc_account.dart';
 import 'package:mnscloud_phoneweb/src/contacts/phone_contact.dart';
@@ -9,6 +12,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
   });
 
   test(
@@ -64,6 +68,11 @@ void main() {
       expect(loaded.selectedAccountId, account.id);
       expect(loaded.accounts, hasLength(1));
       expect(loaded.accounts.single.password, 'secret');
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString('mnscloud_phoneweb.accounts.v1'),
+        isNot(contains('secret')),
+      );
       expect(loaded.accounts.single.status, RegistrationStatus.offline);
       expect(loaded.contacts, hasLength(1));
       expect(loaded.contacts.single.id, contact.id);
@@ -72,4 +81,51 @@ void main() {
       expect(loaded.callHistory.single.diagnostic, 'SIP 486 · Busy Here');
     },
   );
+
+  test('moves legacy plain-text passwords into the secret store', () async {
+    SharedPreferences.setMockInitialValues({
+      'mnscloud_phoneweb.accounts.v1': jsonEncode([
+        {
+          'id': 'legacy-1',
+          'name': 'Legacy',
+          'displayName': 'Legacy',
+          'username': '1001',
+          'password': 'legacy-secret',
+          'domain': 'pbx.example.com',
+          'wssServer': 'wss://pbx.example.com/ws',
+          'hasPassword': true,
+        },
+      ]),
+    });
+    final store = StandalonePhoneWebStore();
+
+    final first = await store.load();
+    expect(first.accounts.single.password, 'legacy-secret');
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString('mnscloud_phoneweb.accounts.v1'),
+      isNot(contains('legacy-secret')),
+    );
+
+    final second = await store.load();
+    expect(second.accounts.single.password, 'legacy-secret');
+  });
+
+  test('removing an account deletes its stored password', () async {
+    final store = StandalonePhoneWebStore();
+    final account = WebRtcAccount.fromJson({
+      'id': 'acc-2',
+      'name': 'Remove me',
+      'username': '1002',
+      'password': 'to-delete',
+      'domain': 'pbx.example.com',
+      'wssServer': 'wss://pbx.example.com/ws',
+    });
+    await store.saveAccounts([account]);
+    await store.saveAccounts([]);
+    await store.saveAccounts([account.copyWith(password: '')]);
+
+    final loaded = await store.load();
+    expect(loaded.accounts.single.password, isEmpty);
+  });
 }
