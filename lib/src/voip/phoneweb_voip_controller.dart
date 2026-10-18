@@ -594,6 +594,9 @@ class PhoneWebVoipController extends ChangeNotifier
   }
 
   List<Map<String, String>> _iceServers(WebRtcAccount account) {
+    if (account.iceServers.isNotEmpty) {
+      return [for (final server in account.iceServers) Map.of(server)];
+    }
     final servers = <Map<String, String>>[];
     if (account.stunServer.trim().isNotEmpty) {
       servers.add({'urls': account.stunServer.trim()});
@@ -643,9 +646,13 @@ class PhoneWebVoipController extends ChangeNotifier
       options['rtcAnswerConstraints'] as Map,
     );
     rtcOfferConstraints['offerModifiers'] = [modifier];
+    // Per call, so refreshed TURN credentials apply without re-registering.
+    final pcConfig = Map<String, dynamic>.from(options['pcConfig'] as Map);
+    if (account != null) pcConfig['iceServers'] = _iceServers(account);
 
     return {
       ...options,
+      'pcConfig': pcConfig,
       'rtcOfferConstraints': rtcOfferConstraints,
       'rtcAnswerConstraints': rtcAnswerConstraints,
     };

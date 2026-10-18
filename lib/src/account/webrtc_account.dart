@@ -318,6 +318,8 @@ class WebRtcAccount {
     required this.status,
     this.diagnostic,
     this.managedBy,
+    this.iceServers = const [],
+    this.iceExpiresAt,
   });
 
   final String id;
@@ -341,6 +343,12 @@ class WebRtcAccount {
   final String? managedBy;
 
   bool get managed => managedBy != null;
+
+  /// ICE servers issued with a managed line (STUN plus TURN with short-lived
+  /// REST credentials). In memory only: never persisted, replaced before
+  /// [iceExpiresAt].
+  final List<Map<String, String>> iceServers;
+  final DateTime? iceExpiresAt;
 
   factory WebRtcAccount.fromJson(Map<String, dynamic> json) {
     return WebRtcAccount(
@@ -403,6 +411,8 @@ class WebRtcAccount {
     RegistrationStatus? status,
     RegistrationDiagnostic? diagnostic,
     String? managedBy,
+    List<Map<String, String>>? iceServers,
+    DateTime? iceExpiresAt,
   }) {
     return WebRtcAccount(
       id: id ?? this.id,
@@ -423,6 +433,8 @@ class WebRtcAccount {
       status: status ?? this.status,
       diagnostic: diagnostic ?? this.diagnostic,
       managedBy: managedBy ?? this.managedBy,
+      iceServers: iceServers ?? this.iceServers,
+      iceExpiresAt: iceExpiresAt ?? this.iceExpiresAt,
     );
   }
 }

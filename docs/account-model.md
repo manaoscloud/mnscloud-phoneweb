@@ -134,8 +134,12 @@ password of its own:
   refresh token is kept in the OS keychain/keystore;
 - the access token lives only in memory and is renewed before it expires.
 
-Signing in never changes manual accounts. Lines assigned by the company come in
-a later release.
+Signing in never changes manual accounts. Company lines (assigned to the user
+or taken from the free-lines pool) appear as read-only "MNSCloud · …" accounts:
+their SIP secret and ICE servers come from the API registration bundle and live
+only in memory. TURN entries carry short-lived REST credentials; PhoneWeb fetches
+a new bundle in the last hour before `iceExpiresAt` and applies it to the next
+call without a new REGISTER.
 
 ## Future Provisioning
 

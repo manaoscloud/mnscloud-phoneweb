@@ -307,7 +307,16 @@ void main() {
                     {
                       'urls': ['stun:turn.example.com:3478'],
                     },
+                    {
+                      'urls': [
+                        'turn:turn.example.com:3478?transport=udp',
+                        'turns:turn.example.com:5349?transport=tcp',
+                      ],
+                      'username': '1700043200:L1',
+                      'credential': 'T5C5XYAp6F/i1iXDtfThjfLQpr4=',
+                    },
                   ],
+                  'iceExpiresAt': '2023-11-15T10:13:20.000Z',
                 },
               }),
               200,
@@ -329,6 +338,20 @@ void main() {
       expect(credentials?.password, 'line-secret');
       expect(credentials?.wssUrl, 'wss://webrtc.example.com/ws');
       expect(credentials?.stunUrls, ['stun:turn.example.com:3478']);
+      expect(credentials?.iceServers, [
+        {'urls': 'stun:turn.example.com:3478'},
+        {
+          'urls': 'turn:turn.example.com:3478?transport=udp',
+          'username': '1700043200:L1',
+          'credential': 'T5C5XYAp6F/i1iXDtfThjfLQpr4=',
+        },
+        {
+          'urls': 'turns:turn.example.com:5349?transport=tcp',
+          'username': '1700043200:L1',
+          'credential': 'T5C5XYAp6F/i1iXDtfThjfLQpr4=',
+        },
+      ]);
+      expect(credentials?.iceExpiresAt, DateTime.utc(2023, 11, 15, 10, 13, 20));
       expect(await controller.claimLine('P3'), isTrue);
       expect(controller.lines.map((line) => line.lineKey), ['L1', 'C1']);
       expect(controller.availableLines, isEmpty);
