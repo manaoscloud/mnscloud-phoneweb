@@ -293,7 +293,8 @@ On the web (and installed PWA) PhoneWeb opens on an access screen with the same 
 and the POS (`lib/src/access/`): brand panel beside the form on wide screens, brand above it on
 phones. It signs in with any MNSCloud login (App e-mail, Pulse code or customer portal login) or
 continues without an account, which keeps the standalone softphone for manual SIP/WSS accounts
-(the choice is remembered on the device; sign-in stays available in Settings). It never shows inside
+(the choice is remembered on the device; the "Sign in" button in the header, or the sign-in icon
+on phones, opens the access screen again, and sign-in stays available in Settings). It never shows inside
 the App phone dock (`?embed=app`) and an App handoff or a resumed session skips it.
 
 Brand and copy come from `GET /public/theme/context?app=phoneweb` (Settings › Themes › PhoneWeb
@@ -301,6 +302,14 @@ and Login do PhoneWeb): title, logo, favicon, color, layout, appearance, https s
 links and PT/EN/ES texts; empty fields keep the PhoneWeb defaults. "Forgot your password?" explains
 that App accounts recover it on the App page and that Pulse and portal logins are reset by the
 company. Installed native builds keep sign-in in Settings.
+
+## Languages
+
+Every screen follows the language chosen on the access screen or in Settings › Interface › Language
+(automatic follows the device): English, Português (BR) and Español (ES). `tr('English text')`
+(`lib/src/i18n/phoneweb_strings.dart`) looks the English text up and fills `{name}` placeholders;
+an unknown text shows as written. Changing the language redraws every screen at once. Technical
+debug logs stay in English for support.
 
 ## New version notice
 

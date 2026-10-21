@@ -1,3 +1,5 @@
+import '../i18n/phoneweb_strings.dart';
+
 enum RegistrationStatus {
   offline,
   registering,
@@ -6,10 +8,10 @@ enum RegistrationStatus {
 
   String get label {
     return switch (this) {
-      RegistrationStatus.offline => 'Offline',
-      RegistrationStatus.registering => 'Registering',
-      RegistrationStatus.registered => 'Registered',
-      RegistrationStatus.failed => 'Failed',
+      RegistrationStatus.offline => tr('Offline'),
+      RegistrationStatus.registering => tr('Registering'),
+      RegistrationStatus.registered => tr('Registered'),
+      RegistrationStatus.failed => tr('Failed'),
     };
   }
 }
@@ -37,10 +39,13 @@ class RegistrationDiagnostic {
   final String? reasonPhrase;
   final bool retrying;
 
+  /// Title in the screen language (diagnostics are kept in English for support copies).
   String get summary {
-    if (statusCode == null) return title;
-    return '$statusCode · $title';
+    if (statusCode == null) return tr(title);
+    return '$statusCode · ${tr(title)}';
   }
+
+  String get localizedDetail => tr(detail);
 
   String get copyText {
     final lines = <String>[
@@ -446,20 +451,23 @@ enum WebRtcCodecPolicy {
 
   String get label {
     return switch (this) {
-      WebRtcCodecPolicy.automaticRecommended => 'Automatic',
-      WebRtcCodecPolicy.opusOnly => 'OPUS only',
-      WebRtcCodecPolicy.g711Only => 'G.711 only',
+      WebRtcCodecPolicy.automaticRecommended => tr('Automatic'),
+      WebRtcCodecPolicy.opusOnly => tr('OPUS only'),
+      WebRtcCodecPolicy.g711Only => tr('G.711 only'),
     };
   }
 
   String get description {
     return switch (this) {
-      WebRtcCodecPolicy.automaticRecommended =>
+      WebRtcCodecPolicy.automaticRecommended => tr(
         'Prefers OPUS and allows PCMU/PCMA fallback for SIP trunks.',
-      WebRtcCodecPolicy.opusOnly =>
+      ),
+      WebRtcCodecPolicy.opusOnly => tr(
         'Uses OPUS only. Best for WebRTC-to-WebRTC calls.',
-      WebRtcCodecPolicy.g711Only =>
+      ),
+      WebRtcCodecPolicy.g711Only => tr(
         'Uses PCMU/PCMA only for legacy SIP trunk compatibility.',
+      ),
     };
   }
 

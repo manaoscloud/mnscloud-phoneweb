@@ -1,9 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:mnscloud_phoneweb/src/access/access_preferences.dart';
 import 'package:mnscloud_phoneweb/src/session/mnscloud_session_api.dart';
 import 'package:mnscloud_phoneweb/src/session/mnscloud_session_controller.dart';
 import 'package:mnscloud_phoneweb/src/session/session_platform.dart';
@@ -204,6 +206,8 @@ void main() {
   });
 
   test('API errors map to user messages', () async {
+    accessLocale.value = const Locale('pt', 'BR');
+    addTearDown(() => accessLocale.value = null);
     final controller = controllerWith(
       MockClient(
         (request) async => http.Response(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_update_controller.dart';
+import '../i18n/phoneweb_strings.dart';
 
 /// Calm, non-blocking "new version" card. The host decides where it sits and
 /// hides it during calls; this widget never reloads by itself.
@@ -19,7 +20,7 @@ class AppUpdateNotice extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       container: true,
-      label: critical ? 'Atualização importante' : 'Nova versão disponível',
+      label: critical ? tr('Important update') : tr('New version available'),
       child: Material(
         elevation: 6,
         color: colorScheme.surfaceContainerHigh,
@@ -54,8 +55,8 @@ class AppUpdateNotice extends StatelessWidget {
                     Text.rich(
                       TextSpan(
                         text: critical
-                            ? 'Atualização importante'
-                            : 'Nova versão disponível',
+                            ? tr('Important update')
+                            : tr('New version available'),
                         style: textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -73,7 +74,9 @@ class AppUpdateNotice extends StatelessWidget {
                     const SizedBox(height: 4),
                     if (critical)
                       Text(
-                        'Esta versão corrige um problema importante. Atualize assim que possível; suas contas e o histórico ficam salvos.',
+                        tr(
+                          'This version fixes an important problem. Update as soon as possible; your accounts and history stay saved.',
+                        ),
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           height: 1.4,
@@ -81,9 +84,11 @@ class AppUpdateNotice extends StatelessWidget {
                       )
                     else
                       Text(
-                        'O PhoneWeb foi atualizado com melhorias e correções. '
-                        'Atualize quando for conveniente; suas contas e o histórico '
-                        'ficam salvos.',
+                        tr(
+                          tr(
+                            'PhoneWeb was updated with improvements and fixes. Update when convenient; your accounts and history stay saved.',
+                          ),
+                        ),
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           height: 1.4,
@@ -98,12 +103,12 @@ class AppUpdateNotice extends StatelessWidget {
                         if (!critical)
                           TextButton(
                             onPressed: controller.postpone,
-                            child: const Text('Depois'),
+                            child: Text(tr('Later')),
                           ),
                         FilledButton.icon(
                           onPressed: controller.reloadNow,
                           icon: const Icon(Icons.refresh, size: 18),
-                          label: const Text('Atualizar agora'),
+                          label: Text(tr('Update now')),
                         ),
                       ],
                     ),
@@ -112,7 +117,7 @@ class AppUpdateNotice extends StatelessWidget {
               ),
               if (!critical)
                 IconButton(
-                  tooltip: 'Lembrar mais tarde',
+                  tooltip: tr('Remind me later'),
                   onPressed: controller.postpone,
                   icon: const Icon(Icons.close),
                   color: colorScheme.onSurfaceVariant,

@@ -16,6 +16,7 @@ import 'src/bridge/voip_bridge_host.dart';
 import 'src/brand/brand.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
+import 'src/i18n/phoneweb_strings.dart';
 import 'src/session/mnscloud_session_api.dart';
 import 'src/session/mnscloud_session_controller.dart';
 import 'src/session/mnscloud_session_section.dart';
@@ -25,15 +26,24 @@ import 'src/version/app_update_notice.dart';
 import 'src/version/runtime_version.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
 
-const double _desktopSideFooterHeight = 260;
-
 void main() {
+  // A new language (access screen or Settings) redraws every screen at once.
+  accessLocale.addListener(_rebuildAllScreens);
   runApp(const PhoneWebApp());
   // Web only: the domain brand (Settings › Themes › PhoneWeb) and the access language.
   if (kIsWeb) {
     unawaited(loadPhoneWebBrand());
     unawaited(loadAccessLocale());
   }
+}
+
+void _rebuildAllScreens() {
+  void rebuild(Element element) {
+    element.markNeedsBuild();
+    element.visitChildren(rebuild);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(rebuild);
 }
 
 class PhoneWebApp extends StatelessWidget {
@@ -118,10 +128,9 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   final MnscloudSessionController _mnscloud = MnscloudSessionController();
   String? _selectedAccountId;
   String _dialNumber = '';
-  String _lastEvent = 'Ready';
+  String _lastEvent = tr('Ready');
   int _mobileTabIndex = 0;
   bool _contactsSyncing = false;
-  String _contactsStatus = 'Agenda local';
   final AppUpdateController _update = AppUpdateController();
   bool _standaloneDirty = false;
   bool _hadActiveCall = false;
@@ -220,9 +229,6 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
               _accounts.any((account) => account.id == state.selectedAccountId)
           ? state.selectedAccountId
           : (_accounts.isEmpty ? null : _accounts.first.id);
-      _contactsStatus = _contacts.isEmpty
-          ? 'Agenda local'
-          : '${_contacts.length} contato(s) local(is) salvo(s)';
     });
 
     final selectedAccountId = _selectedAccountId;
@@ -263,6 +269,14 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       _accessSkipped = skipped;
       _accessReady = true;
     });
+  }
+
+  /// Back to the access screen from the softphone (web, signed out).
+  bool get _signInAvailable => _accessGate && !_mnscloud.signedIn;
+
+  void _openAccessScreen() {
+    unawaited(writeAccessSkipped(false));
+    setState(() => _accessSkipped = false);
   }
 
   void _continueWithoutAccount() {
@@ -415,9 +429,11 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   bool _refuseManaged(WebRtcAccount? account) {
     if (account == null || !account.managed) return false;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Linha gerenciada pela sua empresa na MNSCloud: não pode ser editada nem excluída aqui.',
+          tr(
+            'Managed line of your company in MNSCloud: it cannot be edited or removed here.',
+          ),
         ),
       ),
     );
@@ -449,11 +465,11 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       final index = _accounts.indexWhere((item) => item.id == result.id);
       if (index >= 0) {
         _accounts[index] = result;
-        _lastEvent = '${result.name} updated';
+        _lastEvent = tr('{name} updated', {'name': result.name});
       } else {
         _accounts.add(result);
         _selectedAccountId = result.id;
-        _lastEvent = '${result.name} added';
+        _lastEvent = tr('{name} added', {'name': result.name});
       }
       if (result.enabled) {
         _enforceSingleActiveAccount(result.id);
@@ -473,7 +489,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       if (_selectedAccountId == account.id) {
         _selectedAccountId = _accounts.isEmpty ? null : _accounts.first.id;
       }
-      _lastEvent = '${account.name} removed';
+      _lastEvent = tr('{name} removed', {'name': account.name});
     });
     await _saveStandaloneAccounts();
   }
@@ -570,7 +586,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       PhoneCallHistoryEntry(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         remoteIdentity: _trackedCallRemote.isEmpty
-            ? 'Unknown'
+            ? tr('Unknown')
             : _trackedCallRemote,
         direction: _trackedCallIncoming
             ? PhoneCallDirection.incoming
@@ -653,7 +669,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       } else {
         _contacts.add(result);
       }
-      _lastEvent = '${result.name} saved';
+      _lastEvent = tr('{name} saved', {'name': result.name});
     });
     await _saveStandaloneContacts();
   }
@@ -684,7 +700,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   Future<void> _removeHistoryEntry(PhoneCallHistoryEntry entry) async {
     setState(() {
       _callHistory.removeWhere((item) => item.id == entry.id);
-      _lastEvent = 'Call history entry removed';
+      _lastEvent = tr('Call history entry removed');
     });
     await _saveStandaloneHistory();
   }
@@ -695,19 +711,24 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear call history?'),
+        title: Text(tr('Clear call history?')),
         content: Text(
-          'This will remove ${_callHistory.length} local call history entr${_callHistory.length == 1 ? 'y' : 'ies'} from this device.',
+          tr(
+            tr(
+              'This will remove {n} local call history entries from this device.',
+            ),
+            {'n': _callHistory.length},
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(tr('Cancel')),
           ),
           FilledButton.tonalIcon(
             onPressed: () => Navigator.pop(context, true),
             icon: const Icon(Icons.delete_sweep_outlined),
-            label: const Text('Clear history'),
+            label: Text(tr('Clear history')),
           ),
         ],
       ),
@@ -716,7 +737,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
     setState(() {
       _callHistory.clear();
-      _lastEvent = 'Call history cleared';
+      _lastEvent = tr('Call history cleared');
     });
     await _saveStandaloneHistory();
   }
@@ -764,15 +785,16 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
     setState(() {
       _contactsSyncing = true;
-      _contactsStatus = 'Sincronizando agenda...';
     });
 
     final result = await _contactsRepository.loadContacts();
     if (!mounted) return;
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(result.message)));
 
     setState(() {
       _contactsSyncing = false;
-      _contactsStatus = result.message;
       _lastEvent = result.message;
 
       final shouldSaveContacts = result.status == NativeContactsStatus.loaded;
@@ -852,6 +874,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         onClear: _clearDial,
         onCall: _makeCall,
         onOpenSettings: _openSettingsDialog,
+        onSignIn: _signInAvailable ? _openAccessScreen : null,
         onAddAccount: () => _openAccountDialog(),
         onEditAccount: (account) => _openAccountDialog(account: account),
         onRemoveAccount: _removeAccount,
@@ -872,7 +895,6 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
         contactForHistoryEntry: _contactForHistoryEntry,
         onSyncContacts: _syncNativeContacts,
         contactsSyncing: _contactsSyncing,
-        contactsStatus: _contactsStatus,
       );
     }
 
@@ -889,6 +911,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                 accountCount: _accounts.length,
                 onOpenSettings: _openSettingsDialog,
                 onAddAccount: () => _openAccountDialog(),
+                onSignIn: _signInAvailable ? _openAccessScreen : null,
               ),
               const SizedBox(height: 20),
               Expanded(
@@ -920,12 +943,10 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                SizedBox(
-                                  height: _desktopSideFooterHeight,
+                                Expanded(
                                   child: ContactsSummaryPanel(
                                     contacts: _contacts,
                                     contactsSyncing: _contactsSyncing,
-                                    contactsStatus: _contactsStatus,
                                     useInternalScroll: true,
                                     onAddContact: () => _openContactDialog(),
                                     onSyncContacts: _syncNativeContacts,
@@ -985,7 +1006,6 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
       ContactsSummaryPanel(
         contacts: _contacts,
         contactsSyncing: _contactsSyncing,
-        contactsStatus: _contactsStatus,
         onAddContact: () => _openContactDialog(),
         onSyncContacts: _syncNativeContacts,
         onEditContact: (contact) => _openContactDialog(contact: contact),
@@ -1085,10 +1105,7 @@ class WorkspacePanels extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    SizedBox(
-                      height: _desktopSideFooterHeight,
-                      child: MessagesPanel(useInternalScroll: true),
-                    ),
+                    Expanded(child: MessagesPanel(useInternalScroll: true)),
                   ],
                 ),
               ),
@@ -1156,10 +1173,11 @@ class MobilePhoneShell extends StatelessWidget {
     required this.contactForHistoryEntry,
     required this.onSyncContacts,
     required this.contactsSyncing,
-    required this.contactsStatus,
+    this.onSignIn,
     super.key,
   });
 
+  final VoidCallback? onSignIn;
   final List<WebRtcAccount> accounts;
   final List<PhoneContact> contacts;
   final List<PhoneCallHistoryEntry> callHistory;
@@ -1190,7 +1208,6 @@ class MobilePhoneShell extends StatelessWidget {
   contactForHistoryEntry;
   final VoidCallback onSyncContacts;
   final bool contactsSyncing;
-  final String contactsStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -1214,7 +1231,6 @@ class MobilePhoneShell extends StatelessWidget {
         onDialContact: onDialContact,
         onSyncContacts: onSyncContacts,
         contactsSyncing: contactsSyncing,
-        contactsStatus: contactsStatus,
       ),
       MobileHistoryView(
         entries: callHistory,
@@ -1233,6 +1249,7 @@ class MobilePhoneShell extends StatelessWidget {
         child: Column(
           children: [
             MobileTopBar(
+              onSignIn: onSignIn,
               account: selectedAccount,
               accountCount: accounts.length,
               onSettings: onOpenSettings,
@@ -1267,19 +1284,22 @@ class MobilePhoneShell extends StatelessWidget {
           backgroundColor: colorScheme.surfaceContainerHighest,
           selectedIndex: currentIndex,
           onDestinationSelected: onTabChanged,
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.dialpad), label: 'Telefone'),
+          destinations: [
+            NavigationDestination(
+              icon: Icon(Icons.dialpad),
+              label: tr('Phone'),
+            ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),
-              label: 'Contatos',
+              label: tr('Contacts'),
             ),
             NavigationDestination(
               icon: Icon(Icons.history),
-              label: 'Historico',
+              label: tr('History'),
             ),
             NavigationDestination(
               icon: Icon(Icons.chat_bubble_outline),
-              label: 'Mensagens',
+              label: tr('Messages'),
             ),
           ],
         ),
@@ -1372,7 +1392,7 @@ class _AccountsBottomSheetState extends State<AccountsBottomSheet> {
               Row(
                 children: [
                   Text(
-                    'Accounts',
+                    tr('Accounts'),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -1380,7 +1400,7 @@ class _AccountsBottomSheetState extends State<AccountsBottomSheet> {
                   const Spacer(),
                   IconButton(
                     onPressed: widget.onAddAccount,
-                    tooltip: 'Add account',
+                    tooltip: tr('Add account'),
                     icon: const Icon(Icons.add),
                   ),
                 ],
@@ -1388,19 +1408,21 @@ class _AccountsBottomSheetState extends State<AccountsBottomSheet> {
               const SizedBox(height: 8),
               SearchBox(
                 controller: _searchController,
-                hintText: 'Search accounts',
+                hintText: tr('Search accounts'),
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
               if (widget.accounts.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 28),
-                  child: Center(child: Text('No WebRTC accounts')),
+                  child: Center(child: Text(tr('No WebRTC accounts'))),
                 )
               else if (filteredAccounts.isEmpty)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 28),
-                  child: Center(child: Text('No accounts match your search.')),
+                  child: Center(
+                    child: Text(tr('No accounts match your search.')),
+                  ),
                 )
               else
                 Flexible(
@@ -1430,8 +1452,8 @@ class _AccountsBottomSheetState extends State<AccountsBottomSheet> {
                                   tooltip:
                                       account.status ==
                                           RegistrationStatus.registered
-                                      ? 'Disconnect account'
-                                      : 'Register account',
+                                      ? tr('Disconnect account')
+                                      : tr('Register account'),
                                   icon: Icon(
                                     account.status ==
                                             RegistrationStatus.registered
@@ -1446,13 +1468,13 @@ class _AccountsBottomSheetState extends State<AccountsBottomSheet> {
                                           context,
                                           account,
                                         ),
-                                    tooltip: 'Registration details',
+                                    tooltip: tr('Registration details'),
                                     icon: const Icon(Icons.info_outline),
                                   ),
                                 IconButton(
                                   onPressed: () =>
                                       widget.onEditAccount(account),
-                                  tooltip: 'Edit account',
+                                  tooltip: tr('Edit account'),
                                   icon: const Icon(Icons.edit_outlined),
                                 ),
                               ],
@@ -1477,6 +1499,7 @@ class MobileTopBar extends StatelessWidget {
     required this.accountCount,
     required this.onSettings,
     required this.onAccounts,
+    this.onSignIn,
     super.key,
   });
 
@@ -1484,16 +1507,17 @@ class MobileTopBar extends StatelessWidget {
   final int accountCount;
   final VoidCallback onSettings;
   final VoidCallback onAccounts;
+  final VoidCallback? onSignIn;
 
   @override
   Widget build(BuildContext context) {
     final currentAccount = account;
     final statusLabel = switch (currentAccount?.status) {
-      RegistrationStatus.registered => 'Registrado',
-      RegistrationStatus.registering => 'Registrando',
-      RegistrationStatus.failed => 'Falha',
-      RegistrationStatus.offline => 'Sem Serviço',
-      null => 'Sem Serviço',
+      RegistrationStatus.registered => tr('Registered'),
+      RegistrationStatus.registering => tr('Registering'),
+      RegistrationStatus.failed => tr('Failed'),
+      RegistrationStatus.offline => tr('No service'),
+      null => tr('No service'),
     };
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -1538,7 +1562,7 @@ class MobileTopBar extends StatelessWidget {
                 ),
                 Text(
                   currentAccount == null
-                      ? 'Nenhuma conta'
+                      ? tr('No account')
                       : currentAccount.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1549,9 +1573,16 @@ class MobileTopBar extends StatelessWidget {
               ],
             ),
           ),
+          if (onSignIn != null)
+            IconButton(
+              key: const Key('mobileSignIn'),
+              onPressed: onSignIn,
+              tooltip: tr('Sign in'),
+              icon: const Icon(Icons.login),
+            ),
           IconButton(
             onPressed: onSettings,
-            tooltip: 'Settings',
+            tooltip: tr('Settings'),
             icon: const Icon(Icons.settings_outlined),
           ),
         ],
@@ -1943,7 +1974,6 @@ class MobileContactsView extends StatefulWidget {
     required this.onDialContact,
     required this.onSyncContacts,
     required this.contactsSyncing,
-    required this.contactsStatus,
     super.key,
   });
 
@@ -1953,7 +1983,6 @@ class MobileContactsView extends StatefulWidget {
   final ValueChanged<PhoneContact> onDialContact;
   final VoidCallback onSyncContacts;
   final bool contactsSyncing;
-  final String contactsStatus;
 
   @override
   State<MobileContactsView> createState() => _MobileContactsViewState();
@@ -1982,7 +2011,7 @@ class _MobileContactsViewState extends State<MobileContactsView> {
           Row(
             children: [
               Text(
-                'Contatos',
+                tr('Contacts'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -1992,7 +2021,7 @@ class _MobileContactsViewState extends State<MobileContactsView> {
                 onPressed: widget.contactsSyncing
                     ? null
                     : widget.onSyncContacts,
-                tooltip: 'Sincronizar agenda do dispositivo',
+                tooltip: tr('Sync device address book'),
                 icon: widget.contactsSyncing
                     ? const SizedBox(
                         width: 20,
@@ -2010,22 +2039,10 @@ class _MobileContactsViewState extends State<MobileContactsView> {
           const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
-            hintText: 'Buscar contato',
+            hintText: tr('Search contact'),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              widget.contactsStatus,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
           Expanded(
             child: widget.contacts.isEmpty
                 ? Center(
@@ -2038,10 +2055,10 @@ class _MobileContactsViewState extends State<MobileContactsView> {
                           color: colorScheme.onSurfaceVariant,
                         ),
                         const SizedBox(height: 12),
-                        const Text('Nenhum contato'),
+                        Text(tr('No contacts')),
                         const SizedBox(height: 4),
                         Text(
-                          'Adicione contatos para discar mais rápido.',
+                          tr('Add contacts to dial faster.'),
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 18),
@@ -2058,22 +2075,22 @@ class _MobileContactsViewState extends State<MobileContactsView> {
                                   ),
                                 )
                               : const Icon(Icons.sync_outlined),
-                          label: const Text('Sincronizar agenda'),
+                          label: Text(tr('Sync address book')),
                         ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
                           onPressed: widget.onAddContact,
                           icon: const Icon(Icons.add),
-                          label: const Text('Adicionar contato'),
+                          label: Text(tr('Add contact')),
                         ),
                       ],
                     ),
                   )
                 : filteredContacts.isEmpty
-                ? const MobileEmptyTab(
+                ? MobileEmptyTab(
                     icon: Icons.search_off_outlined,
-                    title: 'Nenhum contato encontrado',
-                    message: 'Tente buscar por nome, empresa ou número.',
+                    title: tr('No contact found'),
+                    message: tr('Try searching by name, company or number.'),
                   )
                 : ListView.separated(
                     itemCount: filteredContacts.length,
@@ -2101,8 +2118,8 @@ class _MobileContactsViewState extends State<MobileContactsView> {
                         trailing: Wrap(
                           children: [
                             if (contact.source == PhoneContactSource.native)
-                              const Tooltip(
-                                message: 'Contato sincronizado do dispositivo',
+                              Tooltip(
+                                message: tr('Contact synced from the device'),
                                 child: Icon(Icons.contacts_outlined, size: 20),
                               ),
                             IconButton(
@@ -2179,7 +2196,7 @@ class _MobileHistoryViewState extends State<MobileHistoryView> {
               const Spacer(),
               IconButton(
                 onPressed: widget.entries.isEmpty ? null : widget.onClearAll,
-                tooltip: 'Limpar histórico',
+                tooltip: tr('Clear history'),
                 icon: const Icon(Icons.delete_sweep_outlined),
               ),
             ],
@@ -2187,23 +2204,24 @@ class _MobileHistoryViewState extends State<MobileHistoryView> {
           const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
-            hintText: 'Buscar histórico',
+            hintText: tr('Search history'),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 14),
           Expanded(
             child: widget.entries.isEmpty
-                ? const MobileEmptyTab(
+                ? MobileEmptyTab(
                     icon: Icons.history,
-                    title: 'Histórico vazio',
-                    message:
-                        'As chamadas realizadas e recebidas aparecerão aqui.',
+                    title: tr('Empty history'),
+                    message: tr('Placed and received calls will appear here.'),
                   )
                 : filteredEntries.isEmpty
-                ? const MobileEmptyTab(
+                ? MobileEmptyTab(
                     icon: Icons.search_off_outlined,
-                    title: 'Nenhuma chamada encontrada',
-                    message: 'Tente buscar por número, conta, status ou SIP.',
+                    title: tr('No call found'),
+                    message: tr(
+                      'Try searching by number, account, status or SIP.',
+                    ),
                   )
                 : ListView.separated(
                     itemCount: filteredEntries.length,
@@ -2285,12 +2303,16 @@ class AppHeader extends StatelessWidget {
     required this.accountCount,
     required this.onOpenSettings,
     required this.onAddAccount,
+    this.onSignIn,
     super.key,
   });
 
   final int accountCount;
   final VoidCallback onOpenSettings;
   final VoidCallback onAddAccount;
+
+  /// Opens the MNSCloud access screen; null when signed in or not on the web.
+  final VoidCallback? onSignIn;
 
   @override
   Widget build(BuildContext context) {
@@ -2314,7 +2336,9 @@ class AppHeader extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '$accountCount WebRTC account${accountCount == 1 ? '' : 's'} configured',
+              accountCount == 1
+                  ? tr('1 WebRTC account configured')
+                  : tr('{n} WebRTC accounts configured', {'n': accountCount}),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -2331,15 +2355,22 @@ class AppHeader extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           alignment: compact ? WrapAlignment.start : WrapAlignment.end,
           children: [
+            if (onSignIn != null)
+              OutlinedButton.icon(
+                key: const Key('headerSignIn'),
+                onPressed: onSignIn,
+                icon: const Icon(Icons.login),
+                label: Text(tr('Sign in')),
+              ),
             OutlinedButton.icon(
               onPressed: onOpenSettings,
               icon: const Icon(Icons.settings_outlined),
-              label: const Text('Settings'),
+              label: Text(tr('Settings')),
             ),
             FilledButton.icon(
               onPressed: onAddAccount,
               icon: const Icon(Icons.add),
-              label: const Text('Add account'),
+              label: Text(tr('Add account')),
             ),
           ],
         ),
@@ -2492,13 +2523,13 @@ class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
                   Row(
                     children: [
                       Text(
-                        'Settings',
+                        tr('Settings'),
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       const Spacer(),
                       IconButton(
-                        tooltip: 'Fechar',
+                        tooltip: tr('Close'),
                         onPressed: () => Navigator.of(context).pop(),
                         icon: const Icon(Icons.close),
                       ),
@@ -2530,7 +2561,7 @@ class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
     }
 
     return AlertDialog(
-      title: const Text('Settings'),
+      title: Text(tr('Settings')),
       content: SizedBox(
         width: 860,
         child: ConstrainedBox(
@@ -2571,7 +2602,7 @@ class _PhoneWebSettingsDialogState extends State<PhoneWebSettingsDialog> {
       actions: [
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Fechar'),
+          child: Text(tr('Close')),
         ),
       ],
     );
@@ -2611,11 +2642,15 @@ class _SettingsSectionSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       (PhoneWebSettingsSection.mnscloud, Icons.cloud_outlined, 'MNSCloud'),
-      (PhoneWebSettingsSection.interface, Icons.palette_outlined, 'Interface'),
+      (
+        PhoneWebSettingsSection.interface,
+        Icons.palette_outlined,
+        tr('Interface'),
+      ),
       (
         PhoneWebSettingsSection.audioVideo,
         Icons.perm_media_outlined,
-        'Áudio e Vídeo',
+        tr('Audio and Video'),
       ),
       (PhoneWebSettingsSection.debug, Icons.bug_report_outlined, 'Debug'),
     ];
@@ -2691,27 +2726,55 @@ class _InterfaceSettingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _SettingsSectionCard(
-      title: 'Interface',
-      subtitle: 'Preferências visuais do PhoneWeb.',
+      title: tr('Interface'),
+      subtitle: tr('Visual preferences of PhoneWeb.'),
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.brightness_auto_outlined),
-          title: const Text('Tema'),
-          subtitle: const Text('Automático pelo sistema'),
+          title: Text(tr('Theme')),
+          subtitle: Text(tr('Automatic (system)')),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.translate_outlined),
-          title: const Text('Idioma'),
-          subtitle: const Text('Automático pelo navegador/sistema'),
+          title: Text(tr('Language')),
+          subtitle: Text(
+            tr('Language of the screens; follows the device when automatic.'),
+          ),
+          trailing: DropdownButton<String>(
+            key: const Key('settingsLanguage'),
+            value: accessLocale.value?.toLanguageTag() ?? 'auto',
+            underline: const SizedBox.shrink(),
+            onChanged: (value) {
+              if (value != null) unawaited(setAccessLocale(value));
+            },
+            items: [
+              DropdownMenuItem(
+                value: 'auto',
+                child: Text(tr('Automatic (browser/system)')),
+              ),
+              const DropdownMenuItem(
+                value: 'pt-BR',
+                child: Text('Português (BR)'),
+              ),
+              const DropdownMenuItem(
+                value: 'en-US',
+                child: Text('English (US)'),
+              ),
+              const DropdownMenuItem(
+                value: 'es-ES',
+                child: Text('Español (ES)'),
+              ),
+            ],
+          ),
         ),
         const Divider(height: 28),
         Row(
           children: [
             Expanded(
               child: Text(
-                'Versão',
+                tr('Version'),
                 style: Theme.of(
                   context,
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
@@ -2730,27 +2793,27 @@ class _AudioVideoSettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _SettingsSectionCard(
-      title: 'Áudio e Vídeo',
-      subtitle: 'Configurações locais de mídia do softphone.',
+    return _SettingsSectionCard(
+      title: tr('Audio and Video'),
+      subtitle: tr('Local media settings of the softphone.'),
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.mic_none_outlined),
-          title: Text('Microfone'),
-          subtitle: Text('Usa o dispositivo padrão permitido pelo navegador.'),
+          title: Text(tr('Microphone')),
+          subtitle: Text(tr('Uses the default device allowed by the browser.')),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.volume_up_outlined),
-          title: Text('Saída de áudio'),
-          subtitle: Text('Usa a saída padrão do sistema/navegador.'),
+          title: Text(tr('Audio output')),
+          subtitle: Text(tr('Uses the default system/browser output.')),
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.videocam_outlined),
           title: Text('Vídeo'),
-          subtitle: Text('Reservado para chamadas futuras com vídeo.'),
+          subtitle: Text(tr('Reserved for future video calls.')),
         ),
       ],
     );
@@ -2775,7 +2838,9 @@ class _DebugSettingsSection extends StatelessWidget {
 
     return _SettingsSectionCard(
       title: 'Debug',
-      subtitle: 'Diagnóstico local para SIP/WebRTC, mídia e ações da tela.',
+      subtitle: tr(
+        'Local diagnostics for SIP/WebRTC, media and screen actions.',
+      ),
       children: [
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
@@ -2784,14 +2849,19 @@ class _DebugSettingsSection extends StatelessWidget {
             voip.setDebugLoggingEnabled(enabled);
             onChanged();
           },
-          title: const Text('Ativar debug detalhado'),
-          subtitle: const Text(
-            'Capture eventos SIP/WebRTC, mídia, registro e ações da tela para copiar e enviar para análise.',
+          title: Text(tr('Enable detailed debug')),
+          subtitle: Text(
+            tr(
+              'Capture SIP/WebRTC, media, registration and screen events to copy and send for analysis.',
+            ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          '${voip.debugEvents.length} evento(s) capturado(s). O buffer mantém os últimos 600 eventos.',
+          tr(
+            tr('{n} event(s) captured. The buffer keeps the last 600 events.'),
+            {'n': voip.debugEvents.length},
+          ),
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -2836,19 +2906,19 @@ class _DebugSettingsSection extends StatelessWidget {
                 onChanged();
               },
               icon: const Icon(Icons.delete_sweep_outlined),
-              label: const Text('Limpar'),
+              label: Text(tr('Clear')),
             ),
             FilledButton.icon(
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: logText));
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Debug copiado')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(tr('Debug copied'))));
                 }
               },
               icon: const Icon(Icons.copy_outlined),
-              label: const Text('Copiar'),
+              label: Text(tr('Copy')),
             ),
           ],
         ),
@@ -2952,16 +3022,18 @@ class _AccountPanelState extends State<AccountPanel> {
       if (widget.accounts.isEmpty)
         EmptyState(
           icon: Icons.wifi_calling_3_outlined,
-          title: 'No WebRTC accounts',
-          message: 'Add a WSS provider account to start configuring calls.',
-          actionLabel: 'Add account',
+          title: tr('No WebRTC accounts'),
+          message: tr('Add a WSS provider account to start configuring calls.'),
+          actionLabel: tr('Add account'),
           onAction: widget.onAddAccount,
         )
       else if (filteredAccounts.isEmpty)
-        const EmptyState(
+        EmptyState(
           icon: Icons.search_off_outlined,
-          title: 'No accounts found',
-          message: 'Search by account name, SIP user, domain, WSS or status.',
+          title: tr('No accounts found'),
+          message: tr(
+            'Search by account name, SIP user, domain, WSS or status.',
+          ),
         )
       else
         ...filteredAccounts.map(
@@ -2985,9 +3057,9 @@ class _AccountPanelState extends State<AccountPanel> {
         children: [
           PanelTitle(
             icon: Icons.account_circle_outlined,
-            title: 'Accounts',
+            title: tr('Accounts'),
             action: IconButton(
-              tooltip: 'Add account',
+              tooltip: tr('Add account'),
               onPressed: widget.onAddAccount,
               icon: const Icon(Icons.add),
             ),
@@ -2995,7 +3067,7 @@ class _AccountPanelState extends State<AccountPanel> {
           const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
-            hintText: 'Search accounts',
+            hintText: tr('Search accounts'),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
@@ -3034,7 +3106,7 @@ class SearchBox extends StatelessWidget {
         suffixIcon: controller.text.isEmpty
             ? null
             : IconButton(
-                tooltip: 'Clear search',
+                tooltip: tr('Clear search'),
                 onPressed: () {
                   controller.clear();
                   onChanged('');
@@ -3147,25 +3219,25 @@ class AccountTile extends StatelessWidget {
                     ),
                     label: Text(
                       account.status == RegistrationStatus.registered
-                          ? 'Disable'
-                          : 'Enable',
+                          ? tr('Disable')
+                          : tr('Enable'),
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    tooltip: 'Edit account',
+                    tooltip: tr('Edit account'),
                     onPressed: onEdit,
                     icon: const Icon(Icons.edit_outlined),
                   ),
                   if (account.diagnostic != null)
                     IconButton(
-                      tooltip: 'Registration details',
+                      tooltip: tr('Registration details'),
                       onPressed: () =>
                           _showRegistrationDiagnosticDialog(context, account),
                       icon: const Icon(Icons.info_outline),
                     ),
                   IconButton(
-                    tooltip: 'Remove account',
+                    tooltip: tr('Remove account'),
                     onPressed: onRemove,
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -3216,7 +3288,9 @@ class RegistrationDiagnosticBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 diagnostic.retrying
-                    ? '${diagnostic.summary} · retrying'
+                    ? tr('{summary} · retrying', {
+                        'summary': diagnostic.summary,
+                      })
                     : diagnostic.summary,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -3243,7 +3317,7 @@ Future<void> _showRegistrationDiagnosticDialog(
   await showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Registration diagnostic'),
+      title: Text(tr('Registration diagnostic')),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
@@ -3251,26 +3325,26 @@ Future<void> _showRegistrationDiagnosticDialog(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              InfoRow(label: 'Account', value: account.name),
-              InfoRow(label: 'SIP user', value: account.username),
-              InfoRow(label: 'Domain', value: account.domain),
+              InfoRow(label: tr('Account'), value: account.name),
+              InfoRow(label: tr('SIP user'), value: account.username),
+              InfoRow(label: tr('Domain'), value: account.domain),
               InfoRow(label: 'WSS', value: account.wssServer),
-              InfoRow(label: 'Status', value: account.status.label),
-              InfoRow(label: 'Diagnostic', value: diagnostic.summary),
-              InfoRow(label: 'Code', value: diagnostic.code),
+              InfoRow(label: tr('Status'), value: account.status.label),
+              InfoRow(label: tr('Diagnostic'), value: diagnostic.summary),
+              InfoRow(label: tr('Code'), value: diagnostic.code),
               if (diagnostic.reasonPhrase != null)
-                InfoRow(label: 'Reason', value: diagnostic.reasonPhrase!),
+                InfoRow(label: tr('Reason'), value: diagnostic.reasonPhrase!),
               InfoRow(
-                label: 'Retrying',
-                value: diagnostic.retrying ? 'Yes' : 'No',
+                label: tr('Retrying'),
+                value: diagnostic.retrying ? tr('Yes') : tr('No'),
               ),
               InfoRow(
-                label: 'Observed',
+                label: tr('Observed'),
                 value: diagnostic.observedAt.toLocal().toString(),
               ),
               const SizedBox(height: 12),
               Text(
-                diagnostic.detail,
+                diagnostic.localizedDetail,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -3282,17 +3356,17 @@ Future<void> _showRegistrationDiagnosticDialog(
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: diagnostic.copyText));
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Diagnostic copied')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(tr('Diagnostic copied'))));
             }
           },
           icon: const Icon(Icons.copy_outlined),
-          label: const Text('Copy'),
+          label: Text(tr('Copy')),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
+          child: Text(tr('Close')),
         ),
       ],
     ),
@@ -3332,7 +3406,7 @@ class DialerPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PanelTitle(icon: Icons.dialpad_outlined, title: 'Dialer'),
+          PanelTitle(icon: Icons.dialpad_outlined, title: tr('Dialer')),
           const SizedBox(height: 16),
           AccountContextBanner(account: selectedAccount),
           const SizedBox(height: 16),
@@ -3357,7 +3431,9 @@ class DialerPanel extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              dialNumber.isEmpty ? 'Enter number' : dialNumber,
+                              dialNumber.isEmpty
+                                  ? tr('Enter number')
+                                  : dialNumber,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleLarge
@@ -3370,12 +3446,12 @@ class DialerPanel extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'Backspace',
+                            tooltip: tr('Backspace'),
                             onPressed: dialNumber.isEmpty ? null : onBackspace,
                             icon: const Icon(Icons.backspace_outlined),
                           ),
                           IconButton(
-                            tooltip: 'Clear',
+                            tooltip: tr('Clear'),
                             onPressed: dialNumber.isEmpty ? null : onClear,
                             icon: const Icon(Icons.close),
                           ),
@@ -3406,7 +3482,7 @@ class DialerPanel extends StatelessWidget {
                           child: FilledButton.icon(
                             onPressed: canCall ? onCall : null,
                             icon: const Icon(Icons.call),
-                            label: const Text('Call'),
+                            label: Text(tr('Call')),
                           ),
                         ),
                       ),
@@ -3453,7 +3529,7 @@ class AccountContextBanner extends StatelessWidget {
           Expanded(
             child: Text(
               currentAccount == null
-                  ? 'Select or add an account before placing calls.'
+                  ? tr('Select or add an account before placing calls.')
                   : '${currentAccount.name} · ${currentAccount.status.label}',
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: colorScheme.onSecondaryContainer),
@@ -3509,7 +3585,7 @@ class ActiveCallControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final remote = voip.remoteIdentity.isEmpty
-        ? 'Unknown'
+        ? tr('Unknown')
         : voip.remoteIdentity;
 
     return Container(
@@ -3556,7 +3632,7 @@ class ActiveCallControls extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: voip.answer,
                   icon: const Icon(Icons.call),
-                  label: const Text('Answer'),
+                  label: Text(tr('Answer')),
                 ),
               ] else if (voip.hasPendingAnsweredIncomingCall) ...[
                 FilledButton.tonalIcon(
@@ -3565,25 +3641,27 @@ class ActiveCallControls extends StatelessWidget {
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  label: const Text('Connecting'),
+                  label: Text(tr('Connecting')),
                 ),
               ] else ...[
                 FilledButton.tonalIcon(
                   onPressed: voip.toggleMute,
                   icon: Icon(voip.muted ? Icons.mic_off : Icons.mic),
-                  label: Text(voip.muted ? 'Unmute' : 'Mute'),
+                  label: Text(voip.muted ? tr('Unmute') : tr('Mute')),
                 ),
                 FilledButton.tonalIcon(
                   onPressed: voip.holdSupported ? voip.toggleHold : null,
                   icon: Icon(voip.onHold ? Icons.play_arrow : Icons.pause),
-                  label: Text(voip.onHold ? 'Resume' : 'Hold'),
+                  label: Text(voip.onHold ? tr('Resume') : tr('Hold')),
                 ),
               ],
               FilledButton.icon(
                 onPressed: voip.rejectOrHangup,
                 icon: const Icon(Icons.call_end),
                 label: Text(
-                  voip.hasAnswerableIncomingCall ? 'Decline' : 'Hang up',
+                  voip.hasAnswerableIncomingCall
+                      ? tr('Decline')
+                      : tr('Hang up'),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFB91C1C),
@@ -3639,16 +3717,16 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
         .toList();
     final bodyChildren = <Widget>[
       if (widget.entries.isEmpty)
-        const EmptyState(
+        EmptyState(
           icon: Icons.call_outlined,
-          title: 'No calls yet',
-          message: 'Completed calls will appear here.',
+          title: tr('No calls yet'),
+          message: tr('Completed calls will appear here.'),
         )
       else if (filteredEntries.isEmpty)
-        const EmptyState(
+        EmptyState(
           icon: Icons.search_off_outlined,
-          title: 'No calls found',
-          message: 'Search by number, account, status or SIP diagnostic.',
+          title: tr('No calls found'),
+          message: tr('Search by number, account, status or SIP diagnostic.'),
         )
       else
         ...filteredEntries.map(
@@ -3677,12 +3755,15 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: PanelTitle(icon: Icons.history, title: 'Call history'),
+              Expanded(
+                child: PanelTitle(
+                  icon: Icons.history,
+                  title: tr('Call history'),
+                ),
               ),
               IconButton(
                 onPressed: widget.entries.isEmpty ? null : widget.onClearAll,
-                tooltip: 'Clear all call history',
+                tooltip: tr('Clear all call history'),
                 icon: const Icon(Icons.delete_sweep_outlined),
               ),
             ],
@@ -3690,7 +3771,7 @@ class _CallHistoryPanelState extends State<CallHistoryPanel> {
           const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
-            hintText: 'Search call history',
+            hintText: tr('Search call history'),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
@@ -3733,9 +3814,9 @@ class CallHistoryTile extends StatelessWidget {
       PhoneCallStatus.failed => colorScheme.error,
     };
     final statusLabel = switch (entry.status) {
-      PhoneCallStatus.completed => 'Completed',
-      PhoneCallStatus.missed => 'Missed',
-      PhoneCallStatus.failed => 'Failed',
+      PhoneCallStatus.completed => tr('Completed'),
+      PhoneCallStatus.missed => tr('Missed'),
+      PhoneCallStatus.failed => tr('Failed'),
     };
 
     final summary =
@@ -3826,8 +3907,8 @@ class CallHistoryTile extends StatelessWidget {
                         ),
                         visualDensity: VisualDensity.compact,
                         tooltip: hasContact
-                            ? 'Already saved as contact'
-                            : 'Add to contacts',
+                            ? tr('Already saved as contact')
+                            : tr('Add to contacts'),
                         onPressed: hasContact ? null : onAddContact,
                         icon: Icon(
                           hasContact
@@ -3841,7 +3922,7 @@ class CallHistoryTile extends StatelessWidget {
                           height: 36,
                         ),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'Remove from history',
+                        tooltip: tr('Remove from history'),
                         onPressed: onRemove,
                         icon: const Icon(Icons.delete_outline),
                       ),
@@ -3851,7 +3932,7 @@ class CallHistoryTile extends StatelessWidget {
                           height: 36,
                         ),
                         visualDensity: VisualDensity.compact,
-                        tooltip: 'Retornar ligação',
+                        tooltip: tr('Call back'),
                         onPressed: onDial,
                         icon: const Icon(Icons.call_outlined),
                       ),
@@ -3893,11 +3974,11 @@ class _MessagesPanelState extends State<MessagesPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PanelTitle(icon: Icons.chat_bubble_outline, title: 'Mensagens'),
+          PanelTitle(icon: Icons.chat_bubble_outline, title: tr('Messages')),
           const SizedBox(height: 12),
           SearchBox(
             controller: _searchController,
-            hintText: 'Pesquisar mensagens',
+            hintText: tr('Search messages'),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
@@ -3909,11 +3990,13 @@ class _MessagesPanelState extends State<MessagesPanel> {
                     ? Icons.chat_bubble_outline
                     : Icons.search_off_outlined,
                 title: query.isEmpty
-                    ? 'Nenhuma mensagem ainda'
-                    : 'Nenhuma mensagem encontrada',
+                    ? tr('No messages yet')
+                    : tr('No message found'),
                 message: query.isEmpty
-                    ? 'Correio de voz e mensagens ficarão disponíveis aqui.'
-                    : 'Quando mensagens forem sincronizadas, a busca localizará por contato, número, assunto e conteúdo.',
+                    ? tr('Voicemail and messages will be available here.')
+                    : tr(
+                        'When messages are synced, the search will find them by contact, number, subject and content.',
+                      ),
               ),
             ],
           ),
@@ -3995,13 +4078,13 @@ bool _matchesCallHistoryEntry(PhoneCallHistoryEntry entry, String query) {
   if (normalizedQuery.isEmpty) return true;
 
   final statusLabel = switch (entry.status) {
-    PhoneCallStatus.completed => 'Completed',
-    PhoneCallStatus.missed => 'Missed',
-    PhoneCallStatus.failed => 'Failed',
+    PhoneCallStatus.completed => tr('Completed'),
+    PhoneCallStatus.missed => tr('Missed'),
+    PhoneCallStatus.failed => tr('Failed'),
   };
   final directionLabel = switch (entry.direction) {
-    PhoneCallDirection.incoming => 'Incoming',
-    PhoneCallDirection.outgoing => 'Outgoing',
+    PhoneCallDirection.incoming => tr('Incoming'),
+    PhoneCallDirection.outgoing => tr('Outgoing'),
   };
 
   return _searchableText([
@@ -4031,7 +4114,6 @@ class ContactsSummaryPanel extends StatefulWidget {
   const ContactsSummaryPanel({
     required this.contacts,
     required this.contactsSyncing,
-    required this.contactsStatus,
     required this.onAddContact,
     required this.onSyncContacts,
     required this.onEditContact,
@@ -4042,7 +4124,6 @@ class ContactsSummaryPanel extends StatefulWidget {
 
   final List<PhoneContact> contacts;
   final bool contactsSyncing;
-  final String contactsStatus;
   final VoidCallback onAddContact;
   final VoidCallback onSyncContacts;
   final ValueChanged<PhoneContact> onEditContact;
@@ -4072,16 +4153,16 @@ class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
       if (widget.contacts.isEmpty)
         EmptyState(
           icon: Icons.contacts_outlined,
-          title: 'No contacts yet',
-          message: 'Sync the device address book or add a local contact.',
-          actionLabel: 'Sync contacts',
+          title: tr('No contacts yet'),
+          message: tr('Sync the device address book or add a local contact.'),
+          actionLabel: tr('Sync contacts'),
           onAction: widget.contactsSyncing ? null : widget.onSyncContacts,
         )
       else if (filteredContacts.isEmpty)
-        const EmptyState(
+        EmptyState(
           icon: Icons.search_off_outlined,
-          title: 'No contacts found',
-          message: 'Search by name, company or number.',
+          title: tr('No contacts found'),
+          message: tr('Search by name, company or number.'),
         )
       else
         ...filteredContacts.map(
@@ -4109,12 +4190,12 @@ class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
               children: [
                 IconButton(
                   onPressed: () => widget.onEditContact(contact),
-                  tooltip: 'Edit contact',
+                  tooltip: tr('Edit contact'),
                   icon: const Icon(Icons.edit_outlined),
                 ),
                 IconButton(
                   onPressed: () => widget.onDialContact(contact),
-                  tooltip: 'Call contact',
+                  tooltip: tr('Call contact'),
                   icon: const Icon(Icons.call_outlined),
                 ),
               ],
@@ -4129,17 +4210,17 @@ class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: PanelTitle(
                   icon: Icons.contacts_outlined,
-                  title: 'Contacts',
+                  title: tr('Contacts'),
                 ),
               ),
               IconButton(
                 onPressed: widget.contactsSyncing
                     ? null
                     : widget.onSyncContacts,
-                tooltip: 'Sync device contacts',
+                tooltip: tr('Sync device contacts'),
                 icon: widget.contactsSyncing
                     ? const SizedBox(
                         width: 18,
@@ -4150,7 +4231,7 @@ class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
               ),
               IconButton(
                 onPressed: widget.onAddContact,
-                tooltip: 'Add contact',
+                tooltip: tr('Add contact'),
                 icon: const Icon(Icons.add),
               ),
             ],
@@ -4158,17 +4239,8 @@ class _ContactsSummaryPanelState extends State<ContactsSummaryPanel> {
           const SizedBox(height: 8),
           SearchBox(
             controller: _searchController,
-            hintText: 'Search contacts',
+            hintText: tr('Search contacts'),
             onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            widget.contactsStatus,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
           ),
           const SizedBox(height: 12),
           _PanelScrollableContent(
@@ -4270,7 +4342,9 @@ class _ContactDialogState extends State<ContactDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.contact == null ? 'Add contact' : 'Edit contact',
+                  widget.contact == null
+                      ? tr('Add contact')
+                      : tr('Edit contact'),
                   style: Theme.of(
                     context,
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -4278,20 +4352,20 @@ class _ContactDialogState extends State<ContactDialog> {
                 const SizedBox(height: 18),
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: InputDecoration(labelText: tr('Name')),
                   validator: _required,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _numberController,
-                  decoration: const InputDecoration(labelText: 'Phone number'),
+                  decoration: InputDecoration(labelText: tr('Phone number')),
                   keyboardType: TextInputType.phone,
                   validator: _required,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _companyController,
-                  decoration: const InputDecoration(labelText: 'Company'),
+                  decoration: InputDecoration(labelText: tr('Company')),
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -4299,10 +4373,10 @@ class _ContactDialogState extends State<ContactDialog> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                      child: Text(tr('Cancel')),
                     ),
                     const SizedBox(width: 8),
-                    FilledButton(onPressed: _save, child: const Text('Save')),
+                    FilledButton(onPressed: _save, child: Text(tr('Save'))),
                   ],
                 ),
               ],
@@ -4314,7 +4388,7 @@ class _ContactDialogState extends State<ContactDialog> {
   }
 
   String? _required(String? value) {
-    return value == null || value.trim().isEmpty ? 'Required field' : null;
+    return value == null || value.trim().isEmpty ? tr('Required field') : null;
   }
 
   void _save() {
@@ -4411,8 +4485,8 @@ class _AccountDialogState extends State<AccountDialog> {
                 children: [
                   Text(
                     widget.account == null
-                        ? 'Add WebRTC account'
-                        : 'Edit WebRTC account',
+                        ? tr('Add WebRTC account')
+                        : tr('Edit WebRTC account'),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -4426,8 +4500,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Account name',
+                          decoration: InputDecoration(
+                            labelText: tr('Account name'),
                           ),
                           validator: _required,
                         ),
@@ -4436,8 +4510,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _displayNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Display name',
+                          decoration: InputDecoration(
+                            labelText: tr('Display name'),
                           ),
                         ),
                       ),
@@ -4445,8 +4519,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _usernameController,
-                          decoration: const InputDecoration(
-                            labelText: 'SIP user',
+                          decoration: InputDecoration(
+                            labelText: tr('SIP user'),
                           ),
                           validator: _required,
                         ),
@@ -4456,8 +4530,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         child: TextFormField(
                           controller: _passwordController,
                           obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'SIP Password',
+                          decoration: InputDecoration(
+                            labelText: tr('SIP Password'),
                           ),
                         ),
                       ),
@@ -4465,8 +4539,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _domainController,
-                          decoration: const InputDecoration(
-                            labelText: 'SIP Domain',
+                          decoration: InputDecoration(
+                            labelText: tr('SIP Domain'),
                           ),
                           validator: _required,
                         ),
@@ -4475,8 +4549,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _wssController,
-                          decoration: const InputDecoration(
-                            labelText: 'WSS server',
+                          decoration: InputDecoration(
+                            labelText: tr('WSS server'),
                             hintText: 'wss://pbx.example.com/ws',
                           ),
                           validator: _wss,
@@ -4486,8 +4560,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _stunController,
-                          decoration: const InputDecoration(
-                            labelText: 'STUN server',
+                          decoration: InputDecoration(
+                            labelText: tr('STUN server'),
                             hintText: 'stun:stun.example.com:3478',
                           ),
                         ),
@@ -4496,8 +4570,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: TextFormField(
                           controller: _turnController,
-                          decoration: const InputDecoration(
-                            labelText: 'TURN server',
+                          decoration: InputDecoration(
+                            labelText: tr('TURN server'),
                             hintText: 'turn:turn.example.com:3478',
                           ),
                         ),
@@ -4506,8 +4580,8 @@ class _AccountDialogState extends State<AccountDialog> {
                         width: compact ? double.infinity : 224,
                         child: DropdownButtonFormField<WebRtcCodecPolicy>(
                           initialValue: _codecPolicy,
-                          decoration: const InputDecoration(
-                            labelText: 'Codec policy',
+                          decoration: InputDecoration(
+                            labelText: tr('Codec policy'),
                           ),
                           items: WebRtcCodecPolicy.values
                               .map(
@@ -4541,7 +4615,7 @@ class _AccountDialogState extends State<AccountDialog> {
                     children: [
                       FilterChip(
                         selected: _enabled,
-                        label: const Text('Enabled'),
+                        label: Text(tr('Enabled')),
                         avatar: Icon(_enabled ? Icons.check : Icons.close),
                         onSelected: (value) {
                           setState(() {
@@ -4551,7 +4625,7 @@ class _AccountDialogState extends State<AccountDialog> {
                       ),
                       FilterChip(
                         selected: _autoRegister,
-                        label: const Text('Auto register'),
+                        label: Text(tr('Auto register')),
                         avatar: Icon(
                           _autoRegister ? Icons.sync : Icons.sync_disabled,
                         ),
@@ -4563,7 +4637,7 @@ class _AccountDialogState extends State<AccountDialog> {
                       ),
                       FilterChip(
                         selected: _allowInsecureTransport,
-                        label: const Text('Allow WS dev'),
+                        label: Text(tr('Allow WS dev')),
                         avatar: Icon(
                           _allowInsecureTransport
                               ? Icons.lock_open
@@ -4583,13 +4657,13 @@ class _AccountDialogState extends State<AccountDialog> {
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
+                        child: Text(tr('Cancel')),
                       ),
                       const SizedBox(width: 12),
                       FilledButton.icon(
                         onPressed: _submit,
                         icon: const Icon(Icons.save_outlined),
-                        label: const Text('Save'),
+                        label: Text(tr('Save')),
                       ),
                     ],
                   ),
@@ -4604,7 +4678,7 @@ class _AccountDialogState extends State<AccountDialog> {
 
   String? _required(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Required';
+      return tr('Required');
     }
     return null;
   }
@@ -4616,10 +4690,10 @@ class _AccountDialogState extends State<AccountDialog> {
     }
     final trimmed = value!.trim();
     if (!trimmed.startsWith('wss://') && !trimmed.startsWith('ws://')) {
-      return 'Use a WSS URL';
+      return tr('Use a WSS URL');
     }
     if (trimmed.startsWith('ws://') && !_allowInsecureTransport) {
-      return 'Enable WS dev for insecure transport';
+      return tr('Enable WS dev for insecure transport');
     }
     return null;
   }
