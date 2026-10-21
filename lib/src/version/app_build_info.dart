@@ -1,6 +1,6 @@
 const appBuildInfo = AppBuildInfo(
   product: "mnscloud-phoneweb",
-  version: "0.1.66",
+  version: "0.1.67",
   channel: "stable",
 );
 
