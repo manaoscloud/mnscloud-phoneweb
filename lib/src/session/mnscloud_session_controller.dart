@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'mnscloud_session_api.dart';
 import 'session_platform.dart';
+import '../i18n/phoneweb_strings.dart';
 
 enum MnscloudSessionStatus { signedOut, working, signedIn }
 
@@ -97,7 +98,7 @@ class MnscloudSessionController extends ChangeNotifier {
       if (parsed == null) {
         _fail(
           'SERVER_INVALID',
-          'Informe o endereço do servidor MNSCloud (https://...).',
+          tr('Enter the MNSCloud server address (https://...).'),
         );
         return false;
       }
@@ -148,7 +149,7 @@ class MnscloudSessionController extends ChangeNotifier {
       return await _api.lineCredentials(token, lineKey);
     } on MnscloudApiException catch (error) {
       _linesError = error.status == 409
-          ? 'Esta linha ainda não tem acesso WebRTC. Fale com o administrador.'
+          ? tr('This line has no WebRTC access yet. Contact the administrator.')
           : error.message;
       notifyListeners();
       return null;
@@ -164,7 +165,9 @@ class MnscloudSessionController extends ChangeNotifier {
       return true;
     } on MnscloudApiException catch (error) {
       _linesError = error.status == 409
-          ? 'Esta linha foi pega por outra pessoa ou você já tem linhas demais.'
+          ? tr(
+              'This line was taken by someone else or you already have too many lines.',
+            )
           : error.message;
       notifyListeners();
       await refreshLines();
@@ -253,23 +256,30 @@ class MnscloudSessionController extends ChangeNotifier {
 
   String _messageFor(MnscloudApiException error) {
     return switch (error.code) {
-      'PHONE_INVALID_CREDENTIALS' => 'Usuário ou senha inválidos.',
-      'PHONE_TENANT_SELECTION_REQUIRED' =>
-        'Este login tem PhoneWeb em mais de uma empresa. Escolha uma.',
-      'PHONE_ACCESS_DENIED' =>
-        'Este login não tem acesso ao PhoneWeb. Fale com o administrador.',
-      'PHONE_USE_APP_SIGNIN' =>
-        'Entre no App MNSCloud e abra o PhoneWeb a partir dele.',
-      'PHONE_PASSWORD_CHANGE_REQUIRED' =>
-        'Troque a senha temporária (no Pulse ou no portal do cliente) antes de entrar.',
-      'PHONE_ACCOUNT_LOCKED' =>
-        'Conta bloqueada temporariamente. Tente mais tarde.',
-      'PHONE_HANDOFF_INVALID' =>
-        'O link de entrada expirou. Abra o PhoneWeb pelo App novamente.',
-      'COMMERCIAL_ENTITLEMENT_REQUIRED' =>
-        'O PhoneWeb não está incluído na assinatura da empresa.',
-      'NETWORK_ERROR' => 'Não foi possível acessar o servidor MNSCloud.',
-      _ => 'Não foi possível entrar. Tente novamente.',
+      'PHONE_INVALID_CREDENTIALS' => tr('Invalid username or password.'),
+      'PHONE_TENANT_SELECTION_REQUIRED' => tr(
+        'This login has PhoneWeb in more than one company. Choose one.',
+      ),
+      'PHONE_ACCESS_DENIED' => tr(
+        'This login has no PhoneWeb access. Contact the administrator.',
+      ),
+      'PHONE_USE_APP_SIGNIN' => tr(
+        'Sign in to the MNSCloud App and open PhoneWeb from it.',
+      ),
+      'PHONE_PASSWORD_CHANGE_REQUIRED' => tr(
+        'Change the temporary password (in Pulse or the customer portal) before signing in.',
+      ),
+      'PHONE_ACCOUNT_LOCKED' => tr(
+        'Account temporarily locked. Try again later.',
+      ),
+      'PHONE_HANDOFF_INVALID' => tr(
+        'The sign-in link expired. Open PhoneWeb from the App again.',
+      ),
+      'COMMERCIAL_ENTITLEMENT_REQUIRED' => tr(
+        'PhoneWeb is not included in the company subscription.',
+      ),
+      'NETWORK_ERROR' => tr('Could not reach the MNSCloud server.'),
+      _ => tr('Could not sign in. Try again.'),
     };
   }
 

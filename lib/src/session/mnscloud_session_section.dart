@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'mnscloud_session_api.dart';
 import 'mnscloud_session_controller.dart';
+import '../i18n/phoneweb_strings.dart';
 
 /// Settings section "MNSCloud": optional sign-in with the tenant identity
 /// (App e-mail, Pulse login or customer portal login). Same widget on desktop
@@ -71,12 +72,17 @@ class _MnscloudSessionSectionState extends State<MnscloudSessionSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Conta MNSCloud', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          tr('MNSCloud account'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 6),
         Text(
-          'Opcional. Entre com o login que você já usa na MNSCloud: e-mail do App, '
-          'código do Pulse ou login do portal do cliente. Sem entrar, o PhoneWeb '
-          'continua funcionando com contas manuais de qualquer provedor SIP/WSS.',
+          tr(
+            tr(
+              'Optional. Sign in with the login you already use in MNSCloud: App e-mail, Pulse code or customer portal login. Without signing in, PhoneWeb keeps working with manual accounts from any SIP/WSS provider.',
+            ),
+          ),
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
@@ -88,8 +94,8 @@ class _MnscloudSessionSectionState extends State<MnscloudSessionSection> {
             enabled: !working,
             keyboardType: TextInputType.url,
             autofillHints: const [AutofillHints.url],
-            decoration: const InputDecoration(
-              labelText: 'Servidor MNSCloud',
+            decoration: InputDecoration(
+              labelText: tr('MNSCloud server'),
               hintText: 'https://empresa.exemplo.com.br',
               prefixIcon: Icon(Icons.dns_outlined),
             ),
@@ -100,9 +106,9 @@ class _MnscloudSessionSectionState extends State<MnscloudSessionSection> {
           controller: _identifier,
           enabled: !working,
           autofillHints: const [AutofillHints.username],
-          decoration: const InputDecoration(
-            labelText: 'Usuário',
-            hintText: 'E-mail, código do Pulse ou login do portal',
+          decoration: InputDecoration(
+            labelText: tr('Username'),
+            hintText: tr('E-mail, Pulse code or portal login'),
             prefixIcon: Icon(Icons.person_outline),
           ),
         ),
@@ -114,10 +120,10 @@ class _MnscloudSessionSectionState extends State<MnscloudSessionSection> {
           autofillHints: const [AutofillHints.password],
           onSubmitted: (_) => working ? null : _submit(),
           decoration: InputDecoration(
-            labelText: 'Senha',
+            labelText: tr('Password'),
             prefixIcon: const Icon(Icons.lock_outline),
             suffixIcon: IconButton(
-              tooltip: _obscure ? 'Mostrar senha' : 'Ocultar senha',
+              tooltip: _obscure ? tr('Show password') : tr('Hide password'),
               icon: Icon(
                 _obscure
                     ? Icons.visibility_outlined
@@ -132,8 +138,8 @@ class _MnscloudSessionSectionState extends State<MnscloudSessionSection> {
           DropdownButtonFormField<String>(
             initialValue: _tenantUUID,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Empresa',
+            decoration: InputDecoration(
+              labelText: tr('Company'),
               prefixIcon: Icon(Icons.business_outlined),
             ),
             items: [
@@ -166,7 +172,7 @@ class _MnscloudSessionSectionState extends State<MnscloudSessionSection> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.login),
-            label: const Text('Entrar'),
+            label: Text(tr('Sign in')),
           ),
         ),
       ],
@@ -179,10 +185,10 @@ class _SignedIn extends StatelessWidget {
 
   final MnscloudSessionController controller;
 
-  static const _realms = {
-    'user': 'Membro do App MNSCloud',
-    'employee': 'Funcionário (login do Pulse)',
-    'customer_user': 'Cliente (login do portal)',
+  static Map<String, String> get _realms => {
+    'user': tr('App MNSCloud member'),
+    'employee': tr('Employee (Pulse login)'),
+    'customer_user': tr('Customer (portal login)'),
   };
 
   @override
@@ -202,7 +208,7 @@ class _SignedIn extends StatelessWidget {
               color: colors.onPrimaryContainer,
             ),
           ),
-          title: Text(session.displayName ?? 'Conectado'),
+          title: Text(session.displayName ?? tr('Connected')),
           subtitle: Text(_realms[session.realm] ?? session.realm),
         ),
         const SizedBox(height: 12),
@@ -210,8 +216,11 @@ class _SignedIn extends StatelessWidget {
         if (expires != null) ...[
           const SizedBox(height: 8),
           Text(
-            'Sessão válida até ${expires.year}-${_two(expires.month)}-${_two(expires.day)} '
-            '${_two(expires.hour)}:${_two(expires.minute)}',
+            tr('Session valid until {date}', {
+              'date':
+                  '${expires.year}-${_two(expires.month)}-${_two(expires.day)} '
+                  '${_two(expires.hour)}:${_two(expires.minute)}',
+            }),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -223,7 +232,7 @@ class _SignedIn extends StatelessWidget {
                 ? null
                 : controller.signOut,
             icon: const Icon(Icons.logout),
-            label: const Text('Sair'),
+            label: Text(tr('Sign out')),
           ),
         ),
       ],
@@ -239,9 +248,9 @@ class _LinesBlock extends StatelessWidget {
   final MnscloudSessionController controller;
 
   String _source(MnscloudLine line) {
-    if (line.claimed) return 'Ramal livre (reservado)';
-    final kind = line.mode == 'shared' ? 'Compartilhada' : 'Dedicada';
-    return line.primary ? '$kind · principal' : kind;
+    if (line.claimed) return tr('Free extension (reserved)');
+    final kind = line.mode == 'shared' ? tr('Shared') : tr('Dedicated');
+    return line.primary ? tr('{kind} · main', {'kind': kind}) : kind;
   }
 
   @override
@@ -253,9 +262,9 @@ class _LinesBlock extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text('Minhas linhas', style: text.titleSmall)),
+            Expanded(child: Text(tr('My lines'), style: text.titleSmall)),
             IconButton(
-              tooltip: 'Atualizar linhas',
+              tooltip: tr('Refresh lines'),
               onPressed: controller.linesLoading
                   ? null
                   : controller.refreshLines,
@@ -266,7 +275,9 @@ class _LinesBlock extends StatelessWidget {
         if (controller.linesLoading) const LinearProgressIndicator(),
         if (controller.lines.isEmpty && !controller.linesLoading)
           Text(
-            'Nenhuma linha atribuída. Pegue um ramal livre abaixo ou peça ao administrador.',
+            tr(
+              'No line assigned. Take a free extension below or ask the administrator.',
+            ),
             style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
           ),
         for (final line in controller.lines)
@@ -286,19 +297,21 @@ class _LinesBlock extends StatelessWidget {
             subtitle: Text(
               line.webrtcReady
                   ? _source(line)
-                  : '${_source(line)} · sem acesso WebRTC',
+                  : tr('{source} · no WebRTC access', {
+                      'source': _source(line),
+                    }),
               maxLines: 2,
             ),
             trailing: line.claimed
                 ? TextButton(
                     onPressed: () => controller.releaseLine(line.lineKey),
-                    child: const Text('Liberar'),
+                    child: Text(tr('Release')),
                   )
                 : null,
           ),
         if (controller.availableLines.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text('Ramais livres', style: text.titleSmall),
+          Text(tr('Free extensions'), style: text.titleSmall),
           for (final free in controller.availableLines)
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -313,7 +326,7 @@ class _LinesBlock extends StatelessWidget {
                   : Text(free.notes!, maxLines: 1),
               trailing: FilledButton.tonal(
                 onPressed: () => controller.claimLine(free.poolUUID),
-                child: const Text('Pegar'),
+                child: Text(tr('Take')),
               ),
             ),
         ],
