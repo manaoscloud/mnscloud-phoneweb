@@ -287,6 +287,21 @@ Use placeholder examples such as `pbx.example.com`, `wss://pbx.example.com/ws`,
 - [SDK Strategy](docs/sdk-strategy.md)
 - [Roadmap](docs/roadmap.md)
 
+## Access screen and Themes
+
+On the web (and installed PWA) PhoneWeb opens on an access screen with the same layout as Pulse
+and the POS (`lib/src/access/`): brand panel beside the form on wide screens, brand above it on
+phones. It signs in with any MNSCloud login (App e-mail, Pulse code or customer portal login) or
+continues without an account, which keeps the standalone softphone for manual SIP/WSS accounts
+(the choice is remembered on the device; sign-in stays available in Settings). It never shows inside
+the App phone dock (`?embed=app`) and an App handoff or a resumed session skips it.
+
+Brand and copy come from `GET /public/theme/context?app=phoneweb` (Settings › Themes › PhoneWeb
+and Login do PhoneWeb): title, logo, favicon, color, layout, appearance, https support/privacy/terms
+links and PT/EN/ES texts; empty fields keep the PhoneWeb defaults. "Forgot your password?" explains
+that App accounts recover it on the App page and that Pulse and portal logins are reset by the
+company. Installed native builds keep sign-in in Settings.
+
 ## New version notice
 
 On the web/PWA build an open PhoneWeb detects a newer release without a refresh:

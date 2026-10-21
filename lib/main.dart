@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sip_ua/sip_ua.dart';
 
+import 'src/access/access_preferences.dart';
+import 'src/access/access_screen.dart';
 import 'src/account/webrtc_account.dart';
 import 'src/audio/keypad_tone_player.dart';
 import 'src/bridge/phone_bridge.dart';
 import 'src/bridge/phone_bridge_transport.dart';
 import 'src/bridge/voip_bridge_host.dart';
+import 'src/brand/brand.dart';
 import 'src/contacts/native_contacts_repository.dart';
 import 'src/contacts/phone_contact.dart';
 import 'src/session/mnscloud_session_api.dart';
@@ -25,6 +29,11 @@ const double _desktopSideFooterHeight = 260;
 
 void main() {
   runApp(const PhoneWebApp());
+  // Web only: the domain brand (Settings › Themes › PhoneWeb) and the access language.
+  if (kIsWeb) {
+    unawaited(loadPhoneWebBrand());
+    unawaited(loadAccessLocale());
+  }
 }
 
 class PhoneWebApp extends StatelessWidget {
@@ -32,14 +41,17 @@ class PhoneWebApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'MNSCloud PhoneWeb',
-      debugShowCheckedModeBanner: false,
-      theme: _phoneWebTheme(Brightness.light),
-      darkTheme: _phoneWebTheme(Brightness.dark),
-      themeMode: ThemeMode.system,
-      scrollBehavior: const PhoneWebScrollBehavior(),
-      home: const PhoneWebHomePage(),
+    return ValueListenableBuilder<Brand?>(
+      valueListenable: phonewebBrand,
+      builder: (context, brand, _) => MaterialApp(
+        title: brand?.title ?? 'MNSCloud PhoneWeb',
+        debugShowCheckedModeBanner: false,
+        theme: _phoneWebTheme(Brightness.light),
+        darkTheme: _phoneWebTheme(Brightness.dark),
+        themeMode: ThemeMode.system,
+        scrollBehavior: const PhoneWebScrollBehavior(),
+        home: const PhoneWebHomePage(),
+      ),
     );
   }
 }
@@ -122,6 +134,12 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   Timer? _iceRefreshTimer;
   PhoneBridge? _bridge;
 
+  /// The web shows the access screen until the user signs in or continues
+  /// without an account; never inside the App dock (`?embed=app`).
+  final bool _accessGate = kIsWeb && Uri.base.queryParameters['embed'] != 'app';
+  bool _accessReady = false;
+  bool _accessSkipped = false;
+
   @override
   void initState() {
     super.initState();
@@ -131,7 +149,7 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
     _update.addListener(_onUpdateChanged);
     _update.start();
     _mnscloud.addListener(_onMnscloudChanged);
-    unawaited(_mnscloud.restore());
+    unawaited(_restoreSession());
     // Embedded in the App phone dock (`?embed=app`): Phone Bridge v1.
     final bridgeTransport = createEmbeddedBridgeTransport();
     if (bridgeTransport != null) {
@@ -234,6 +252,23 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   static const _managedPrefix = 'mnscloud:';
   bool _syncingLines = false;
   bool _syncAgain = false;
+
+  /// Resumes the MNSCloud session (or the App handoff) before deciding whether
+  /// the access screen is needed, so a signed-in user never sees it flash.
+  Future<void> _restoreSession() async {
+    final skipped = _accessGate ? await readAccessSkipped() : true;
+    await _mnscloud.restore();
+    if (!mounted) return;
+    setState(() {
+      _accessSkipped = skipped;
+      _accessReady = true;
+    });
+  }
+
+  void _continueWithoutAccount() {
+    unawaited(writeAccessSkipped(true));
+    setState(() => _accessSkipped = true);
+  }
 
   void _onMnscloudChanged() {
     if (mounted) setState(() {});
@@ -763,6 +798,15 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_accessGate && !_accessSkipped && !_mnscloud.signedIn) {
+      if (!_accessReady) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      return PhoneWebAccessScreen(
+        controller: _mnscloud,
+        onContinueWithout: _continueWithoutAccount,
+      );
+    }
     final shell = _buildShell(context);
     // Never interrupt a call: the notice waits until the call ends.
     if (!_update.noticeVisible || _voip.hasActiveCall) return shell;
