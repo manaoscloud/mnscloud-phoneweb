@@ -98,3 +98,7 @@ Do not commit:
 - crash logs with credentials
 - private provider configs
 
+
+## Contact-center authorization
+
+Agent commands use the in-memory PhoneWeb access token and a revision checked by the API. The API resolves tenant, phone identity, line ownership and commercial access; the client cannot assert them. Call and wrap-up states come only from the authenticated PBX runtime. Contact notes are restricted to the session that handled the contact and are never stored in local browser persistence. SSE uses an Authorization header, never a token in its URL, and reconnects with the durable event cursor. The server closes streams when authentication or commercial access expires.
