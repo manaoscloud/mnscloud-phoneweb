@@ -1,3 +1,4 @@
+import '../agent/agent_panel.dart';
 import 'package:flutter/material.dart';
 
 import 'mnscloud_session_api.dart';
@@ -213,6 +214,7 @@ class _SignedIn extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _LinesBlock(controller: controller),
+        AgentPanel(key: ValueKey(session.sessionUUID), session: controller),
         if (expires != null) ...[
           const SizedBox(height: 8),
           Text(

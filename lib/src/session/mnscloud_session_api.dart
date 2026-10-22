@@ -91,8 +91,10 @@ class MnscloudLine {
     required this.label,
     required this.domain,
     this.claimExpiresAt,
+    this.kind = 'pabx',
   });
 
+  final String kind;
   final String lineKey;
   final String source;
   final String mode;
@@ -106,6 +108,7 @@ class MnscloudLine {
   bool get claimed => source == 'claimed';
 
   factory MnscloudLine.fromJson(Map<String, dynamic> json) => MnscloudLine(
+    kind: json['kind']?.toString() ?? '',
     lineKey: json['lineKey']?.toString() ?? '',
     source: json['source']?.toString() ?? 'assigned',
     mode: json['mode']?.toString() ?? 'dedicated',

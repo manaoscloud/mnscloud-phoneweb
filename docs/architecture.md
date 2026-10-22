@@ -185,3 +185,17 @@ UnsupportedProviderConfiguration
 ```
 
 Raw plugin errors must be sanitized before display, logging, or export.
+
+## Contact-center agent panel
+
+The shared signed-in session surface embeds `AgentPanel` on desktop, mobile web and installed PWA. The panel authenticates through the in-memory PhoneWeb access token, displays the server state and queue memberships, and sends revision-checked login, pause, available, logout and finish-wrap-up commands. A pause requires a tenant catalog reason. ON_CALL and WRAP_UP can only originate from authenticated PBX events. Another device cannot take over a live agent session.
+
+`AgentApi` uses authenticated fetch SSE (no token in URLs), reconnects with the last event ID and reloads authoritative state. Missed notifications are recovered from the immutable state ledger. The panel renders a wrap-up countdown, and translates controls in PT/EN/ES. `test/agent_panel_test.dart` verifies pause validation and queue exit at 390px and 1280px.
+
+### Contact-center routing profiles and contact notes
+
+Routing profiles (`VoipPabxAgentProfile` / `VoipPabxAgentProfileQueue`) group queues, penalties and ACW seconds. A linked agent uses the profile's effective memberships; direct memberships are ignored while a profile is selected. The App provides the canonical profile CRUD and queue collection with FK quick-create. Queue selection is filtered by tenant and customer ownership in the database. Profile edits affect all linked agents on reconciliation.
+
+Runtime queue snapshots carry only aggregate waiting count/longest wait, never caller identity. Counters become unavailable after 30 seconds without observation. SSE sends authoritative snapshots as well as durable transition IDs; PhoneWeb does not poll queue state. `VoipPabxAgentContact` records a runtime-authenticated agent participation, with optional disposition and spelling-preserving notes. Notes are limited to 4000 characters and revision-checked against the originating phone session.
+
+Agent creation/enabling checks the active entitlement and passes its quota to the tenant-serialized configure routine, which counts enabled phone-linked agents. Standalone resource contracts without a package limit retain the billing system's unlimited quantity semantics. No prices or paid subscriptions are created by the schema seed. Revoked/expired sessions, disabled identities, lost line assignments and released/expired claims leave the routing set; hot-desk stations are cleared.
