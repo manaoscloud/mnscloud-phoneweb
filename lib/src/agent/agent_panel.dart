@@ -243,7 +243,18 @@ class _AgentPanelState extends State<AgentPanel> {
                 error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
-            for (final queue in queues) Text('${queue['VpqName']}'),
+            for (final queue in queues) ...[
+              Text('${queue['VpqName']}'),
+              Text(
+                queue['WaitingCalls'] == null ||
+                        queue['LongestWaitSeconds'] == null
+                    ? tr('Queue counters unavailable')
+                    : tr('Waiting: {count} · Longest wait: {seconds}s', {
+                        'count': '${queue['WaitingCalls']}',
+                        'seconds': '${queue['LongestWaitSeconds']}',
+                      }),
+              ),
+            ],
             const SizedBox(height: 12),
             if (status == 'LOGGED_OUT') ...[
               DropdownButtonFormField<String>(

@@ -58,6 +58,14 @@ const Map<String, List<String>> _translations = {
     "Este agente está em uso em outro dispositivo.",
     "Este agente está en uso en otro dispositivo.",
   ],
+  'Queue counters unavailable': [
+    'Indicadores da fila indisponíveis',
+    'Indicadores de la cola no disponibles',
+  ],
+  'Waiting: {count} · Longest wait: {seconds}s': [
+    'Aguardando: {count} · Maior espera: {seconds}s',
+    'En espera: {count} · Mayor espera: {seconds}s',
+  ],
   "Contact center": ["Central de atendimento", "Centro de contacto"],
   '1 WebRTC account configured': [
     '1 conta WebRTC configurada',

@@ -44,7 +44,8 @@ class FakeAgent extends AgentApi {
         {'VpzUUID': 'reason', 'VpzName': 'LUNCH'},
       ],
       'queues': [
-        {'VpqName': 'SUPPORT'},
+        {'VpqName': 'SUPPORT', 'WaitingCalls': 3, 'LongestWaitSeconds': 45},
+        {'VpqName': 'OFFLINE'},
       ],
     };
   }
@@ -84,6 +85,16 @@ void main() {
           );
           await tester.pump();
           expect(find.textContaining('SUPPORT'), findsOneWidget);
+          expect(
+            find.text(
+              tr('Waiting: {count} · Longest wait: {seconds}s', {
+                'count': '3',
+                'seconds': '45',
+              }),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text(tr('Queue counters unavailable')), findsOneWidget);
           await tester.tap(find.text(tr('Pause')));
           await tester.pump();
           expect(find.text(tr('Select a pause reason.')), findsOneWidget);
