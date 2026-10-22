@@ -66,6 +66,26 @@ const Map<String, List<String>> _translations = {
     'Aguardando: {count} · Maior espera: {seconds}s',
     'En espera: {count} · Mayor espera: {seconds}s',
   ],
+  "Your phone session expired. Sign in again.": [
+    "Sua sessão telefônica expirou. Entre novamente.",
+    "Su sesión telefónica venció. Inicie sesión de nuevo.",
+  ],
+  "The agent state changed. Review the panel and try again.": [
+    "O estado do agente mudou. Confira o painel e tente novamente.",
+    "El estado del agente cambió. Revise el panel e inténtelo de nuevo.",
+  ],
+  "The agent or contact is no longer available.": [
+    "O agente ou atendimento não está mais disponível.",
+    "El agente o la atención ya no está disponible.",
+  ],
+  "Check the selected line, pause reason and call notes.": [
+    "Confira a linha selecionada, o motivo da pausa e as notas do atendimento.",
+    "Revise la línea seleccionada, el motivo de pausa y las notas de la atención.",
+  ],
+  "Unable to update the agent. Try again.": [
+    "Não foi possível atualizar o agente. Tente novamente.",
+    "No se pudo actualizar el agente. Inténtelo de nuevo.",
+  ],
   "Contact center": ["Central de atendimento", "Centro de contacto"],
   '1 WebRTC account configured': [
     '1 conta WebRTC configurada',

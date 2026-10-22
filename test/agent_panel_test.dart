@@ -119,6 +119,10 @@ void main() {
           await tester.pump();
           await tester.pump();
           expect(find.text(tr('Join queues')), findsOneWidget);
+          api.updates.addError(StateError('Disconnected fixture stream'));
+          await tester.pump();
+          expect(find.text(tr('Connection unavailable')), findsOneWidget);
+          expect(find.text(tr('Queue counters unavailable')), findsNWidgets(2));
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
           session.dispose();

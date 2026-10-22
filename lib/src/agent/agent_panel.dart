@@ -46,7 +46,12 @@ class _AgentPanelState extends State<AgentPanel> {
         AgentApi(server.replace(path: '/api/v1/', query: '', fragment: ''));
     unawaited(
       load().then((_) {
-        if (mounted && !unavailable && agent != null) watch();
+        if (!mounted || unavailable) return;
+        if (agent != null) {
+          watch();
+        } else if (error != null) {
+          retry(failed: true);
+        }
       }),
     );
   }
@@ -62,7 +67,7 @@ class _AgentPanelState extends State<AgentPanel> {
       if (mounted) {
         setState(() {
           unavailable = e.status == 402;
-          error = e.code;
+          error = failureMessage(e);
         });
       }
     } catch (_) {
@@ -104,17 +109,54 @@ class _AgentPanelState extends State<AgentPanel> {
             failures = 0;
             applySnapshot(data);
           },
-          onError: (Object _) => retry(),
+          onError: (Object _) => retry(failed: true),
           onDone: retry,
           cancelOnError: true,
         );
   }
 
-  void retry() {
-    if (!mounted || reconnect?.isActive == true) return;
+  String failureMessage(MnscloudApiException failure) {
+    if (failure.status == 401) {
+      return tr('Your phone session expired. Sign in again.');
+    }
+    if (failure.status == 409) {
+      return tr('The agent state changed. Review the panel and try again.');
+    }
+    if (failure.status == 404) {
+      return tr('The agent or contact is no longer available.');
+    }
+    if (failure.status == 400) {
+      return tr('Check the selected line, pause reason and call notes.');
+    }
+    return tr('Unable to update the agent. Try again.');
+  }
+
+  void retry({bool failed = false}) {
+    if (!mounted || unavailable || reconnect?.isActive == true) return;
+    if (failed) {
+      setState(() {
+        error = tr('Connection unavailable');
+        queues = queues
+            .map(
+              (queue) => {
+                ...queue,
+                'WaitingCalls': null,
+                'LongestWaitSeconds': null,
+              },
+            )
+            .toList();
+      });
+    }
     failures = (failures + 1).clamp(1, 5);
-    reconnect = Timer(Duration(seconds: 1 << failures), () {
-      if (mounted) watch();
+    reconnect = Timer(Duration(seconds: 1 << failures), () async {
+      if (!mounted) return;
+      if (agent == null) await load();
+      if (!mounted || unavailable) return;
+      if (agent != null) {
+        watch();
+      } else if (error != null) {
+        retry(failed: true);
+      }
     });
   }
 
@@ -151,7 +193,7 @@ class _AgentPanelState extends State<AgentPanel> {
       }
     } on MnscloudApiException catch (e) {
       await load();
-      if (mounted) setState(() => error = e.code);
+      if (mounted) setState(() => error = failureMessage(e));
     } catch (_) {
       if (mounted) setState(() => error = tr('Connection unavailable'));
     } finally {
@@ -177,7 +219,7 @@ class _AgentPanelState extends State<AgentPanel> {
       notesDirty = false;
       await load();
     } on MnscloudApiException catch (e) {
-      if (mounted) setState(() => error = e.code);
+      if (mounted) setState(() => error = failureMessage(e));
     } catch (_) {
       if (mounted) setState(() => error = tr('Connection unavailable'));
     } finally {
