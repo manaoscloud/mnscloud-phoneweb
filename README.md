@@ -327,3 +327,7 @@ Critical updates: a release that fixes a serious problem sets `minimumVersion` i
 `web/update-policy.json` (usually to its own version, in the same PR). `mnscloud-webapps` copies it
 into `build.json`; pages running below it get an "important update" notice without the postpone
 action. It never reloads by itself. Keep it `null` for regular releases.
+
+## Optional contact-center mode
+
+Signed-in MNSCloud phone users with an enabled contact-center agent can join their assigned queues, select a pause reason, request their next state during a call, finish after-call work and save a call outcome and notes. The same panel is available on desktop, mobile web and installed PWA. Queue waiting counters update through authenticated events and show unavailable when observations expire. Manual standalone accounts remain independent. See [Architecture](docs/architecture.md#contact-center-agent-panel).

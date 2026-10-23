@@ -154,3 +154,7 @@ Manual configuration is the default. Future provisioning may be added through:
 Provisioning must remain optional. The standalone manual flow must continue to
 work without a backend.
 
+
+## Contact-center station
+
+Agent identity belongs to the signed-in phone user, independently of the manual SIP accounts. The administrator configures a fixed station or permits hot desking. Joining queues selects an assigned PABX line or a line claimed by the current session; softswitch and manual accounts cannot become contact-center stations. A routing profile supplies queue memberships, penalties and after-call work durations. Only the session that joined controls that active agent; signing out revokes its routing eligibility.

@@ -13,6 +13,80 @@ String tr(String english, [Map<String, Object?> args = const {}]) {
 
 /// English -> [pt-BR, es-ES].
 const Map<String, List<String>> _translations = {
+  '{queue}: counters unavailable': [
+    '{queue}: contadores indisponíveis',
+    '{queue}: contadores no disponibles',
+  ],
+  '{queue}: {waiting} waiting, longest {seconds}s': [
+    '{queue}: {waiting} em espera, maior espera {seconds}s',
+    '{queue}: {waiting} en espera, espera máxima {seconds}s',
+  ],
+  "Other": ["Outro", "Otro"],
+  "Voicemail": ["Caixa postal", "Buzón de voz"],
+  "Wrong number": ["Número incorreto", "Número incorrecto"],
+  "No interest": ["Sem interesse", "Sin interés"],
+  "Follow up": ["Retornar contato", "Seguimiento"],
+  "Resolved": ["Resolvido", "Resuelto"],
+  "Save call notes": ["Salvar notas da chamada", "Guardar notas de la llamada"],
+  "Call notes": ["Notas da chamada", "Notas de la llamada"],
+  "Call outcome": ["Resultado da chamada", "Resultado de la llamada"],
+  "Refresh": ["Atualizar", "Actualizar"],
+  "Line": ["Linha", "Línea"],
+  "Pause": ["Pausar", "Pausar"],
+  "Available": ["Disponível", "Disponible"],
+  "WRAP_UP": ["Pós-atendimento", "Posllamada"],
+  "ON_CALL": ["Em atendimento", "En llamada"],
+  "PAUSED": ["Em pausa", "En pausa"],
+  "AVAILABLE": ["Disponível", "Disponible"],
+  "LOGGED_OUT": ["Fora das filas", "Fuera de las colas"],
+  "Wrap-up: {seconds}s": [
+    "Pós-atendimento: {seconds}s",
+    "Posllamada: {seconds}s",
+  ],
+  "Next status": ["Próximo estado", "Próximo estado"],
+  "Connection unavailable": ["Conexão indisponível", "Conexión no disponible"],
+  "Select a pause reason.": [
+    "Selecione um motivo de pausa.",
+    "Seleccione un motivo de pausa.",
+  ],
+  "Select a line.": ["Selecione uma linha.", "Seleccione una línea."],
+  "Pause reason": ["Motivo da pausa", "Motivo de pausa"],
+  "Finish wrap-up": ["Concluir pós-atendimento", "Finalizar posllamada"],
+  "Leave queues": ["Sair das filas", "Salir de las colas"],
+  "Join queues": ["Entrar nas filas", "Entrar en las colas"],
+  "This agent is controlled by another signed-in device.": [
+    "Este agente está em uso em outro dispositivo.",
+    "Este agente está en uso en otro dispositivo.",
+  ],
+  'Queue counters unavailable': [
+    'Indicadores da fila indisponíveis',
+    'Indicadores de la cola no disponibles',
+  ],
+  'Waiting: {count} · Longest wait: {seconds}s': [
+    'Aguardando: {count} · Maior espera: {seconds}s',
+    'En espera: {count} · Mayor espera: {seconds}s',
+  ],
+  "Your phone session expired. Sign in again.": [
+    "Sua sessão telefônica expirou. Entre novamente.",
+    "Su sesión telefónica venció. Inicie sesión de nuevo.",
+  ],
+  "The agent state changed. Review the panel and try again.": [
+    "O estado do agente mudou. Confira o painel e tente novamente.",
+    "El estado del agente cambió. Revise el panel e inténtelo de nuevo.",
+  ],
+  "The agent or contact is no longer available.": [
+    "O agente ou atendimento não está mais disponível.",
+    "El agente o la atención ya no está disponible.",
+  ],
+  "Check the selected line, pause reason and call notes.": [
+    "Confira a linha selecionada, o motivo da pausa e as notas do atendimento.",
+    "Revise la línea seleccionada, el motivo de pausa y las notas de la atención.",
+  ],
+  "Unable to update the agent. Try again.": [
+    "Não foi possível atualizar o agente. Tente novamente.",
+    "No se pudo actualizar el agente. Inténtelo de nuevo.",
+  ],
+  "Contact center": ["Central de atendimento", "Centro de contacto"],
   '1 WebRTC account configured': [
     '1 conta WebRTC configurada',
     '1 cuenta WebRTC configurada',

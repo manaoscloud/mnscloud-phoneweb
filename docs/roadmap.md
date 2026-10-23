@@ -57,3 +57,7 @@ Traditional SIP is intentionally out of scope now. A future review may evaluate:
 
 Traditional SIP must remain optional and separate from the WebRTC core.
 
+
+## Optional MNSCloud contact-center integration
+
+The P3 agent panel implements session-owned queue login, pause reasons, next state, runtime-derived call/after-call state, queue counters and contact notes/outcomes with desktop/mobile/PWA parity. It depends on the MNSCloud phone identity and provisioning APIs. Supervisor wallboards, forced state, listen/whisper/barge and ephemeral SIP authentication remain separate later phases.
