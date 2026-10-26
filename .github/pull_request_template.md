@@ -69,6 +69,11 @@ Result:
 - [ ] Linux
 - [ ] Not applicable
 
+## Multiplatform parity (workspace AGENTS.md → PhoneWeb multiplatform contract)
+
+- [ ] Checked one desktop width and one mobile/PWA width: visibility, scrolling, touch targets and
+      the same primary actions (or the limitation is documented in `docs/platform-limitations.md`)
+
 ## WebRTC Provider Compatibility
 
 Describe any effect on Asterisk, FreeSWITCH, Kamailio, OpenSIPS, or hosted WebRTC providers.

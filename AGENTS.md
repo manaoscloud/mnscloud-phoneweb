@@ -22,8 +22,9 @@ This repository is a standalone public MNSCloud Flutter client.
 
 ## Language
 
-All repository code comments, documentation, examples, commit messages, and
-public-facing text must be written in English.
+Code, comments, documentation, examples and commit messages are written in English. User-facing
+UI strings ship in en-US, pt-BR and es-ES (`lib/src/i18n`), and each PR carries the workspace
+release note block in pt-BR/en/es.
 
 ## Contribution Workflow
 
@@ -35,7 +36,9 @@ public-facing text must be written in English.
 
 ## Architecture Rules
 
-- Keep the app backend-independent.
+- Standalone mode needs no backend (manually configured SIP over secure WebSocket). The optional
+  MNSCloud session uses only `/phone/auth/*` and the documented contact-center API; the API stays
+  the authority for accounts, permissions and routing.
 - Keep credentials on the user's device through secure storage.
 - Keep SIP/WebRTC logic behind domain interfaces.
 - Keep UI independent from the concrete `sip_ua` implementation.

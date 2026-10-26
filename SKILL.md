@@ -22,16 +22,18 @@ traditional SIP transports.
 
 ## Architecture Rules
 
-- Use clean boundaries: `presentation`, `application`, `domain`, and
-  `infrastructure`.
-- Keep modules separated: account, voip, call, call history, settings, audio,
-  diagnostics, and shared utilities.
+- Current layout is by feature under `lib/src/` (`access`, `account`, `agent`, `audio`, `brand`,
+  `bridge`, `contacts`, `i18n`, `session`, `storage`, `version`, `voip`). The layered split below is
+  the target for new code, not a description of today's tree; do not refactor existing modules
+  only to match it.
+- Target boundaries: `presentation`, `application`, `domain`, and `infrastructure`.
 - The domain layer must not import Flutter UI or `sip_ua`.
 - The application layer orchestrates use cases but does not know storage or UI
   details.
 - Infrastructure owns `sip_ua`, `flutter_webrtc`, secure storage, local storage,
   platform permissions, and diagnostics adapters.
-- Keep a `VoipEngine` abstraction even while only one WebRTC engine exists.
+- Target: a `VoipEngine` abstraction around the WebRTC engine (not present yet; introduce it when a
+  second engine is added).
 - Traditional SIP engines must be optional future packages, not hardwired into
   the WebRTC app.
 
