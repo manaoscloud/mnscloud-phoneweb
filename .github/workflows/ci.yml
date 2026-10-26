@@ -6,6 +6,11 @@ on:
     branches:
       - main
 
+
+# Read-only token: analysis, tests and builds publish nothing.
+permissions:
+  contents: read
+
 jobs:
   flutter:
     name: Flutter Analyze And Test
