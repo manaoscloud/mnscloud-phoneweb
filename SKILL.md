@@ -64,6 +64,6 @@ available formatting or lint checks.
 
 ## Maintainer Workflow
 
-After completed changes, validate, commit, and push to the GitHub remote. If a
-change spans the workspace registry or documentation, commit and push those
-changes separately in the root workspace repository.
+After completed changes, validate, commit on your task branch, push that branch and merge only through the workspace
+`scripts/ops/merge.sh`. If a change spans the workspace
+registry or documentation, deliver it with its own PR in the workspace repository.
