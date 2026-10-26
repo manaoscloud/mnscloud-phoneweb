@@ -15,12 +15,12 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
 
       - name: Install dependencies
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         run: flutter analyze
@@ -28,3 +28,12 @@ jobs:
       - name: Test
         run: flutter test
 
+
+  sonarcloud:
+    # SonarQube Cloud CI analysis (Dart is not covered by automatic analysis); shared and pinned in
+    # mnscloud-runtime-kit. Skipped with a notice while SONAR_TOKEN is not available.
+    uses: manaoscloud/mnscloud-runtime-kit/.github/workflows/sonarcloud-dart.yml@main
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    with:
+      exclusions: "third_party/**"

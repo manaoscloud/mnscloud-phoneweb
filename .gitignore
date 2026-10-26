@@ -5,7 +5,6 @@ build/
 releases/*.tar.gz
 releases/*.tar.gz.sha256
 coverage/
-pubspec.lock
 
 # Flutter generated platform folders will be committed after the first real app
 # scaffold is generated. Keep local IDE and build artifacts out.
