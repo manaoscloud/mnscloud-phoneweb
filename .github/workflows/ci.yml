@@ -42,3 +42,18 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
       exclusions: "third_party/**"
+
+  build-android:
+    # Compiles the Android app (debug, no signing) so manifest and resource changes are proven.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter build apk --debug

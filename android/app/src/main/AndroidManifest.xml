@@ -2,6 +2,8 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:label="MNSCloud PhoneWeb"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
