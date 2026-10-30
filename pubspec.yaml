@@ -4,7 +4,7 @@ publish_to: "none"
 version: 0.1.71
 
 environment:
-  sdk: ">=3.8.0 <4.0.0"
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
@@ -13,10 +13,8 @@ dependencies:
   flutter_contacts: ^2.0.2
   flutter_secure_storage: ^11.0.0
   flutter_webrtc: ^1.6.0
-  go_router: ^17.5.0
   http: ^1.2.2
   url_launcher: ^6.3.3
-  permission_handler: ^13.0.1
   shared_preferences: ^2.5.3
   sip_ua:
     path: third_party/sip_ua
