@@ -317,7 +317,7 @@ void main() {
                         'turns:turn.example.com:5349?transport=tcp',
                       ],
                       'username': '1700043200:L1',
-                      'credential': 'T5C5XYAp6F/i1iXDtfThjfLQpr4=',
+                      'credential': 'example-turn-credential',
                     },
                   ],
                   'iceExpiresAt': '2023-11-15T10:13:20.000Z',
@@ -347,12 +347,12 @@ void main() {
         {
           'urls': 'turn:turn.example.com:3478?transport=udp',
           'username': '1700043200:L1',
-          'credential': 'T5C5XYAp6F/i1iXDtfThjfLQpr4=',
+          'credential': 'example-turn-credential',
         },
         {
           'urls': 'turns:turn.example.com:5349?transport=tcp',
           'username': '1700043200:L1',
-          'credential': 'T5C5XYAp6F/i1iXDtfThjfLQpr4=',
+          'credential': 'example-turn-credential',
         },
       ]);
       expect(credentials?.iceExpiresAt, DateTime.utc(2023, 11, 15, 10, 13, 20));
