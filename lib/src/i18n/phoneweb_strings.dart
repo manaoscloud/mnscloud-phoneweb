@@ -182,6 +182,11 @@ const Map<String, List<String>> _translations = {
   'Clear history': ['Apagar histórico', 'Borrar historial'],
   'Clear search': ['Limpar busca', 'Limpiar búsqueda'],
   'Close': ['Fechar', 'Cerrar'],
+  'Install app': ['Instalar app', 'Instalar app'],
+  'In Safari, tap Share and then "Add to Home Screen".': [
+    'No Safari, toque em Compartilhar e depois em "Adicionar à Tela de Início".',
+    'En Safari, toca Compartir y luego "Agregar a pantalla de inicio".',
+  ],
   'Code': ['Código', 'Código'],
   'Codec policy': ['Política de codecs', 'Política de códecs'],
   'Company': ['Empresa', 'Empresa'],

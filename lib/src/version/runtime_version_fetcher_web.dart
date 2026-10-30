@@ -4,6 +4,7 @@ import 'dart:js_interop';
 import 'package:web/web.dart' as web;
 
 import 'runtime_version.dart';
+import '../pwa/pwa.dart';
 
 /// Reads `build.json`, written by mnscloud-webapps next to `index.html` of the
 /// active release, so the version is the one a reload would load.
@@ -71,4 +72,5 @@ void writeUpdateSnooze(String key, String value) {
   }
 }
 
-void reloadPage() => web.window.location.reload();
+/// Activates the waiting PWA revision (service worker) and reloads; plain reload without it.
+void reloadPage() => pwaApplyUpdate();

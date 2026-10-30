@@ -22,8 +22,8 @@ jobs:
     uses: manaoscloud/mnscloud-runtime-kit/.github/workflows/flutter-client-ci.yml@main
     with:
       targets: "web,android,linux,windows,macos,ios"
-      web_mode: plain
-      web_check: bash scripts/validate-pwa.sh --base-href /
+      web_mode: pwa
+      pwa_app: phoneweb
       native_check_args: >-
         --android-permission RECORD_AUDIO --android-permission MODIFY_AUDIO_SETTINGS
         --android-permission READ_CONTACTS
@@ -49,7 +49,8 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
-      exclusions: "third_party/**"
+      # web/flutter_bootstrap.js is a Flutter build template ({{flutter_js}}), not JavaScript.
+      exclusions: "third_party/**,web/flutter_bootstrap.js"
 
   security:
     # Shared security gate (Gitleaks, Trivy, Opengrep), pinned in mnscloud-runtime-kit.

@@ -6,6 +6,7 @@ import '../session/mnscloud_session_api.dart';
 import '../session/mnscloud_session_controller.dart';
 import 'access_preferences.dart';
 import 'access_strings.dart';
+import '../pwa/install_app_button.dart';
 
 const _defaultBrandColor = Color(0xff1264ed);
 
@@ -490,6 +491,7 @@ class _AccessShell extends StatelessWidget {
                               child: _AccessBrand(brand: brand),
                             ),
                           const _AccessLanguageButton(),
+                          const InstallAppButton(labeled: true),
                         ],
                       ),
                       SizedBox(height: split ? 76 : 48),

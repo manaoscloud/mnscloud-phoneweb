@@ -90,7 +90,8 @@ Each GitHub Release ships a portable prebuilt web bundle
 flutter build web --release --base-href /phoneweb/
 ```
 
-The generated Flutter service worker caches the static app shell. SIP
+The MNSCloud app-shell service worker (runtime-kit `flutter-pwa.py`) caches the static app
+shell; Flutter's own worker is deprecated and no longer used. SIP
 registration, calls, diagnostics, WSS, STUN, TURN, and media still require
 network connectivity.
 
