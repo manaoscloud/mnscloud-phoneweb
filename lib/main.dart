@@ -25,6 +25,7 @@ import 'src/version/app_update_controller.dart';
 import 'src/version/app_update_notice.dart';
 import 'src/version/runtime_version.dart';
 import 'src/voip/phoneweb_voip_controller.dart';
+import 'src/pwa/install_app_button.dart';
 
 void main() {
   // A new language (access screen or Settings) redraws every screen at once.
@@ -1580,6 +1581,7 @@ class MobileTopBar extends StatelessWidget {
               tooltip: tr('Sign in'),
               icon: const Icon(Icons.login),
             ),
+          const InstallAppButton(),
           IconButton(
             onPressed: onSettings,
             tooltip: tr('Settings'),
@@ -2362,6 +2364,7 @@ class AppHeader extends StatelessWidget {
                 icon: const Icon(Icons.login),
                 label: Text(tr('Sign in')),
               ),
+            const InstallAppButton(labeled: true),
             OutlinedButton.icon(
               onPressed: onOpenSettings,
               icon: const Icon(Icons.settings_outlined),
