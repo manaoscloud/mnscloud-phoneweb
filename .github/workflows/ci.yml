@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Weekly Apple builds (macOS runners cost about ten times Linux minutes).
+    - cron: "23 6 * * 2"
+  workflow_dispatch:
 
 
 # Read-only token: analysis, tests and builds publish nothing.
@@ -12,27 +16,31 @@ permissions:
   contents: read
 
 jobs:
+  client:
+    # Shared MNSCloud Flutter client gate (docs/flutter-client-standard.md in the workspace):
+    # pinned toolchain, native configuration check, analyze, test and one build per target.
+    uses: manaoscloud/mnscloud-runtime-kit/.github/workflows/flutter-client-ci.yml@main
+    with:
+      targets: "web,android,linux,windows,macos,ios"
+      web_mode: plain
+      web_check: bash scripts/validate-pwa.sh --base-href /
+      native_check_args: >-
+        --android-permission RECORD_AUDIO --android-permission MODIFY_AUDIO_SETTINGS
+        --android-permission READ_CONTACTS
+        --macos-entitlement com.apple.security.device.audio-input
+        --ios-plist-key NSMicrophoneUsageDescription
+      # flutter_secure_storage and flutter_webrtc on Linux.
+      linux_packages: "libsecret-1-dev libjsoncpp-dev"
+      apple: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
   flutter:
+    # Required status check of main: passes only when every job of the shared gate passed.
     name: Flutter Analyze And Test
+    needs: client
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-
-      - name: Install dependencies
-        run: flutter pub get --enforce-lockfile
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Test
-        run: flutter test
-
+      - run: test "${{ needs.client.result }}" = success
 
   sonarcloud:
     # SonarQube Cloud CI analysis (Dart is not covered by automatic analysis); shared and pinned in
@@ -43,17 +51,10 @@ jobs:
     with:
       exclusions: "third_party/**"
 
-  build-android:
-    # Compiles the Android app (debug, no signing) so manifest and resource changes are proven.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        with:
-          channel: stable
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter build apk --debug
+  security:
+    # Shared security gate (Gitleaks, Trivy, Opengrep), pinned in mnscloud-runtime-kit.
+    uses: manaoscloud/mnscloud-runtime-kit/.github/workflows/security-scan.yml@main
+    with:
+      # No Dart rule set in opengrep-rules: scan the web loader and scripts only.
+      opengrep_rules: "javascript bash"
+      opengrep_exclude: "test third_party"
