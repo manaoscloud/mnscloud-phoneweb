@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'brand_dom.dart';
+import '../version/client_identity.dart';
 
 /// Brand of the host for PhoneWeb (Settings › Themes › PhoneWeb tab of the tenant domain); every field
 /// the PhoneWeb tab leaves empty comes from the App brand. Null fields keep the MNSCloud defaults.
@@ -85,7 +86,7 @@ const _apiBaseUrl = String.fromEnvironment(
 /// Loads the PhoneWeb brand of the domain. Never blocks or fails PhoneWeb.
 Future<void> loadPhoneWebBrand({http.Client? client}) async {
   final base = _apiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-  final http.Client http0 = client ?? http.Client();
+  final http.Client http0 = MnscloudApiClient(client);
   try {
     final response = await http0
         .get(Uri.parse('$base/public/theme/context?app=phoneweb'))

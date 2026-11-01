@@ -16,6 +16,8 @@ class AppUpdateNotice extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final version = controller.deployed?.version;
     final critical = controller.critical;
+    // Installed apps update through their store: no version, no reload.
+    final installed = !controller.isWeb;
 
     return Semantics(
       liveRegion: true,
@@ -72,7 +74,17 @@ class AppUpdateNotice extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (critical)
+                    if (installed)
+                      Text(
+                        tr(
+                          'This app version is no longer supported. Update the app from the store or with your administrator to continue.',
+                        ),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      )
+                    else if (critical)
                       Text(
                         tr(
                           'This version fixes an important problem. Update as soon as possible; your accounts and history stay saved.',
@@ -94,24 +106,25 @@ class AppUpdateNotice extends StatelessWidget {
                           height: 1.4,
                         ),
                       ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        if (!critical)
-                          TextButton(
-                            onPressed: controller.postpone,
-                            child: Text(tr('Later')),
+                    if (!installed) const SizedBox(height: 8),
+                    if (!installed)
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (!critical)
+                            TextButton(
+                              onPressed: controller.postpone,
+                              child: Text(tr('Later')),
+                            ),
+                          FilledButton.icon(
+                            onPressed: controller.reloadNow,
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: Text(tr('Update now')),
                           ),
-                        FilledButton.icon(
-                          onPressed: controller.reloadNow,
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: Text(tr('Update now')),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
               ),

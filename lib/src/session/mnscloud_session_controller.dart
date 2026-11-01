@@ -58,6 +58,9 @@ class MnscloudSessionController extends ChangeNotifier {
   /// Bearer token for MNSCloud PhoneWeb API calls, or null when signed out.
   String? get accessToken => signedIn ? _grant!.accessToken : null;
 
+  /// API root (`.../api/v1/`) of an MNSCloud server address.
+  static Uri apiRootOf(Uri server) => _apiRoot(server);
+
   static Uri _apiRoot(Uri server) {
     final base = server.replace(
       path: server.path.endsWith('/') ? server.path : '${server.path}/',

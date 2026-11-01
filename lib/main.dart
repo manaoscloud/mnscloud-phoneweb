@@ -132,7 +132,15 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
   String _lastEvent = tr('Ready');
   int _mobileTabIndex = 0;
   bool _contactsSyncing = false;
-  final AppUpdateController _update = AppUpdateController();
+  // Installed apps read the version policy of the selected MNSCloud server.
+  late final AppUpdateController _update = AppUpdateController(
+    apiRoot: () {
+      final server = _mnscloud.server;
+      return server == null
+          ? null
+          : MnscloudSessionController.apiRootOf(server);
+    },
+  );
   bool _standaloneDirty = false;
   bool _hadActiveCall = false;
   bool _trackedCallEstablished = false;
@@ -287,6 +295,8 @@ class _PhoneWebHomePageState extends State<PhoneWebHomePage> {
 
   void _onMnscloudChanged() {
     if (mounted) setState(() {});
+    // A new or changed server re-reads its version policy (installed apps).
+    if (!_update.isWeb) unawaited(_update.check());
     unawaited(_syncMnscloudLines());
   }
 
