@@ -563,6 +563,10 @@ const Map<String, List<String>> _translations = {
     'Este login não tem acesso ao PhoneWeb. Fale com o administrador.',
     'Este acceso no tiene PhoneWeb. Contacte al administrador.',
   ],
+  'This app version is no longer supported. Update the app from the store or with your administrator to continue.': [
+    'Esta versão do app não é mais aceita. Atualize o app pela loja ou com o administrador para continuar.',
+    'Esta versión de la app ya no es compatible. Actualice la app desde la tienda o con su administrador para continuar.',
+  ],
   'This version fixes an important problem. Update as soon as possible; your accounts and history stay saved.': [
     'Esta versão corrige um problema importante. Atualize assim que possível; suas contas e o histórico ficam salvos.',
     'Esta versión corrige un problema importante. Actualice lo antes posible; sus cuentas y el historial quedan guardados.',

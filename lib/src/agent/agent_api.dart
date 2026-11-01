@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../session/mnscloud_session_api.dart';
+import '../version/client_identity.dart';
 
 /// Authenticated agent transport. Credentials stay in memory and never enter URLs.
 class AgentApi {
   AgentApi(this.root, {http.Client? client})
-    : _client = client ?? http.Client();
+    : _client = MnscloudApiClient(client);
   final Uri root;
   final http.Client _client;
 

@@ -16,6 +16,8 @@ void main() {
       reader: () async => null,
       runningVersion: '0.1.58',
       clock: () => now,
+      // The VM runs as an installed app; this suite covers the web build.
+      web: true,
     );
   });
 

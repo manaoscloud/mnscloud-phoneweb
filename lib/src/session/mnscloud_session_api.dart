@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../version/client_identity.dart';
+
 /// Failure of an MNSCloud PhoneWeb API call, with the stable API `code`.
 class MnscloudApiException implements Exception {
   const MnscloudApiException(
@@ -209,7 +211,7 @@ class MnscloudLineCredentials {
 /// given and keeps no state.
 class MnscloudSessionApi {
   MnscloudSessionApi({required this.baseUrl, http.Client? client})
-    : _client = client ?? http.Client();
+    : _client = MnscloudApiClient(client);
 
   /// API root, for example `https://tenant.example.com/api/v1`.
   final Uri baseUrl;
