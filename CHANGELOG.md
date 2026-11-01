@@ -7,6 +7,10 @@ initial planning and scaffolding phase.
 
 ## Unreleased
 
+- Encrypted the local accounts, manual contacts, call history and selected
+  account on every target (AES-GCM with a non-extractable WebCrypto key on
+  the web, secure storage on native builds); clear records of older releases
+  are migrated and removed.
 - Added a visible runtime version badge with optional latest-release discovery
   for MNSCloud-hosted PhoneWeb deployments.
 - Added Progressive Web App manifest hardening, mobile install metadata, PWA

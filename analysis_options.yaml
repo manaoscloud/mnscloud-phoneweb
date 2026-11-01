@@ -10,6 +10,9 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    # Browser-only tests (`flutter test --platform chrome test/web`): the
+    # analyzer resolves the native side of the conditional storage imports.
+    - test/web/**
 
 linter:
   rules:

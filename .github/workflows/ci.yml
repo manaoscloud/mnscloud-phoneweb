@@ -24,6 +24,9 @@ jobs:
       targets: "web,android,linux,windows,macos,ios"
       web_mode: pwa
       pwa_app: phoneweb
+      # Browser storage (encrypted local data) only exists in a real browser; the VM tests run the
+      # native side.
+      web_check: flutter test --platform chrome test/web
       native_check_args: >-
         --android-permission RECORD_AUDIO --android-permission MODIFY_AUDIO_SETTINGS
         --android-permission READ_CONTACTS
