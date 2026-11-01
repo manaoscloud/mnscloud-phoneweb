@@ -5,11 +5,25 @@ customer information.
 
 ## Storage Strategy
 
-Account metadata:
+Local data (`lib/src/storage/standalone_phoneweb_store.dart`,
+`local_data_vault*.dart`): account metadata, manual contacts, call history
+and the selected account are encrypted at rest on every target:
 
-- local database or local preferences
-- no password fields
-- no TURN password fields
+- native builds: `flutter_secure_storage` (keys `phoneweb:<name>`)
+- web/PWA: AES-GCM ciphertext in `localStorage`
+  (`mnscloud_phoneweb.<name>.v2`), sealed by `WebCipher` with the same
+  non-extractable key as the SIP passwords
+- account metadata never carries password or TURN password fields
+- releases before v0.1.80 kept these records in clear
+  (`mnscloud_phoneweb.<name>.v1`, in `localStorage` on the web and in
+  `shared_preferences` on native builds); the first load writes the encrypted
+  copy and only then removes the clear record
+- when nothing can be encrypted (no WebCrypto, IndexedDB or secure storage),
+  changes stay in memory and are never written in clear
+- only non-sensitive preferences stay in clear: access language, "continue
+  without an account" and the update notice snooze
+- contacts, history and accounts load from this local copy, so they open
+  offline with the PWA shell; calls and SIP registration still need the network
 
 Secrets (`lib/src/storage/account_secret_store*.dart`):
 
@@ -18,8 +32,10 @@ Secrets (`lib/src/storage/account_secret_store*.dart`):
 - web/PWA: AES-GCM ciphertext in `localStorage`
   (`mnscloud_phoneweb.secret.v1.<account_id>`), encrypted with a
   **non-extractable** WebCrypto key kept only in IndexedDB
-  (`mnscloud_phoneweb_keys`); without WebCrypto or IndexedDB the password stays
-  in memory and must be typed again after a reload
+  (`mnscloud_phoneweb_keys`, `lib/src/storage/web_cipher.dart`); the key is
+  created once per page, and a tab that loses the race keeps the key another
+  tab stored first; without WebCrypto or IndexedDB the password stays in memory
+  and must be typed again after a reload
 - one secret entry per account and secret type
 - delete secrets when an account is removed
 - records saved by releases before v0.1.61 kept the password inside the account
@@ -27,7 +43,8 @@ Secrets (`lib/src/storage/account_secret_store*.dart`):
   without it
 
 The web protection covers stored data at rest (disk, profile copies, storage
-dumps). Script running inside the PhoneWeb origin can still use the key, so the
+dumps). Browser tests (`flutter test --platform chrome test/web`, also run by
+CI) check that `localStorage` holds no value in clear. Script running inside the PhoneWeb origin can still use the key, so the
 usual XSS defenses remain mandatory.
 
 Example secret keys:

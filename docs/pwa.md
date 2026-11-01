@@ -69,7 +69,8 @@ flutter build web --release --base-href /
 After the first successful visit the installed app opens from the cached shell of its release,
 without a connection; the API, `build.json` and SIP/WebRTC traffic are never cached. A new
 release installs in the background and becomes active when the user taps "Update now" in the
-new-version notice. Registration, calls, diagnostics against SIP servers, and media always require
+new-version notice. Accounts, manual contacts and call history load from the encrypted local copy
+(`docs/security.md`), so they are available offline too. Registration, calls, diagnostics against SIP servers, and media always require
 network connectivity.
 
 ## Installation Notes
